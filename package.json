@@ -9,7 +9,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "next build",
     "postinstall": "next telemetry disable",
     "db:setup": "node scripts/setup-db.js",
     "db:reset": "node scripts/reset-db.js",
