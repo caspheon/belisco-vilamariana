@@ -10,6 +10,9 @@ import { RankingTable } from "../components/ranking-table"
 import type { Player, Match, CreatePlayer, CreateMatch } from "../lib/types"
 import { getAllPlayers, createPlayer, getAllMatches, createMatch, getRanking } from "../lib/db-functions"
 
+// Forçar renderização dinâmica para evitar erros de SSG
+export const dynamic = 'force-dynamic'
+
 export default function SinucaManager() {
   const [players, setPlayers] = useState<Player[]>([])
   const [matches, setMatches] = useState<Match[]>([])
