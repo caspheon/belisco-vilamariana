@@ -188,10 +188,17 @@ export function RankingTable({ players, matches }: RankingTableProps) {
                             </span>
                             <span className="text-gray-200"> {match.type === "individual" ? "venceu" : "venceram"} contra </span>
                             <span className="text-gray-100 font-medium">
-                              {matchPlayers
-                                .filter((p) => !winners.includes(p?.name || ""))
-                                .map((p) => p?.name)
-                                .join(", ")}
+                              {(() => {
+                                const losers = matchPlayers
+                                  .filter((p) => !winners.includes(p?.name || ""))
+                                  .map((p) => p?.name)
+                                  .filter(Boolean)
+                                
+                                if (losers.length === 0) return ""
+                                if (losers.length === 1) return losers[0]
+                                if (losers.length === 2) return `${losers[0]} e ${losers[1]}`
+                                return `${losers.slice(0, -1).join(", ")} e ${losers[losers.length - 1]}`
+                              })()}
                             </span>
                           </div>
                         </div>

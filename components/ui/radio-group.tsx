@@ -12,6 +12,8 @@ export interface RadioGroupItemProps {
   value: string
   id: string
   className?: string
+  checked?: boolean
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
 }
 
 export function RadioGroup({ value, onValueChange, children, className }: RadioGroupProps) {
@@ -21,7 +23,11 @@ export function RadioGroup({ value, onValueChange, children, className }: RadioG
         if (React.isValidElement(child)) {
           return React.cloneElement(child, {
             checked: child.props.value === value,
-            onValueChange,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              if (e.target.checked) {
+                onValueChange?.(e.target.value)
+              }
+            },
           })
         }
         return child
@@ -30,12 +36,14 @@ export function RadioGroup({ value, onValueChange, children, className }: RadioG
   )
 }
 
-export function RadioGroupItem({ value, id, className, ...props }: RadioGroupItemProps & React.InputHTMLAttributes<HTMLInputElement>) {
+export function RadioGroupItem({ value, id, className, checked, onChange, ...props }: RadioGroupItemProps & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       type="radio"
       id={id}
       value={value}
+      checked={checked}
+      onChange={onChange}
       className={cn(
         "h-4 w-4 border-gray-600 text-green-400 focus:ring-2 focus:ring-green-400 focus:ring-offset-2",
         className

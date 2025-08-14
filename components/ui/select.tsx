@@ -14,6 +14,7 @@ export interface SelectItemProps {
   value: string
   children: React.ReactNode
   className?: string
+  onSelect?: (value: string) => void
 }
 
 export interface SelectContentProps {
@@ -60,7 +61,14 @@ export function Select({ value, onValueChange, children, placeholder, className 
       
       {isOpen && (
         <div className="absolute top-full z-50 mt-1 w-full rounded-md border border-gray-600 bg-gray-800 shadow-lg">
-          {children}
+          {React.Children.map(children, (child) => {
+            if (React.isValidElement(child)) {
+              return React.cloneElement(child, {
+                onSelect: handleSelect,
+              })
+            }
+            return child
+          })}
         </div>
       )}
     </div>
@@ -83,19 +91,14 @@ export function SelectContent({ children, className }: SelectContentProps) {
   )
 }
 
-export function SelectItem({ value, children, className, ...props }: SelectItemProps & React.HTMLAttributes<HTMLDivElement>) {
+export function SelectItem({ value, children, className, onSelect, ...props }: SelectItemProps & React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
         "relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-gray-700 hover:text-white focus:bg-gray-700 focus:text-white data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className
       )}
-      onClick={() => {
-        const select = document.querySelector('[data-select]') as any
-        if (select?.handleSelect) {
-          select.handleSelect(value)
-        }
-      }}
+      onClick={() => onSelect?.(value)}
       {...props}
     >
       {children}
