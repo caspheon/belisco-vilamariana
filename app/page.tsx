@@ -8,10 +8,10 @@ import { PlayerManager } from "../components/player-manager"
 import { MatchCreator } from "../components/match-creator"
 import { RankingTable } from "../components/ranking-table"
 import type { Player, Match, CreatePlayer, CreateMatch } from "../lib/types"
-import { getAllPlayers, createPlayer, getAllMatches, createMatch, getRanking } from "../lib/db-functions"
 
 // Forçar renderização dinâmica para evitar erros de SSG
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default function SinucaManager() {
   const [players, setPlayers] = useState<Player[]>([])
@@ -28,6 +28,9 @@ export default function SinucaManager() {
     try {
       setLoading(true)
       setError(null)
+      
+      // Import dinâmico das funções de banco
+      const { getAllPlayers, getAllMatches } = await import('../lib/db-functions')
       
       const [playersData, matchesData] = await Promise.all([
         getAllPlayers(),
@@ -47,6 +50,7 @@ export default function SinucaManager() {
   const addPlayer = async (name: string) => {
     try {
       setError(null)
+      const { createPlayer } = await import('../lib/db-functions')
       const newPlayer = await createPlayer({ name })
       setPlayers(prev => [...prev, newPlayer])
     } catch (err) {
@@ -58,6 +62,7 @@ export default function SinucaManager() {
   const addMatch = async (match: Omit<CreateMatch, "title">) => {
     try {
       setError(null)
+      const { createMatch } = await import('../lib/db-functions')
       const title = `Partida ${new Date().toLocaleDateString('pt-BR')}`
       const newMatch = await createMatch({ ...match, title })
       setMatches(prev => [...prev, newMatch])
