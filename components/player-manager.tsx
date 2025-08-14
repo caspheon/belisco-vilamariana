@@ -8,7 +8,7 @@ import { Input } from "./ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Plus, User } from "lucide-react"
-import type { Player } from "../../lib/types"
+import type { Player } from "../lib/types"
 
 interface PlayerManagerProps {
   players: Player[]

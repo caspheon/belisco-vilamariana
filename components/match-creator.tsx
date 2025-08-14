@@ -8,7 +8,7 @@ import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
 import { Label } from "./ui/label"
 import { Badge } from "./ui/badge"
 import { GamepadIcon, Users, User, Trophy } from "lucide-react"
-import type { Player, Match } from "../../lib/types"
+import type { Player, CreateMatch } from "../lib/types"
 
 interface MatchCreatorProps {
   players: Player[]

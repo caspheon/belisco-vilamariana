@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Trophy, Medal, Award, TrendingUp } from "lucide-react"
-import type { Player, Match } from "../../lib/types"
+import type { Player, Match } from "../lib/types"
 
 interface RankingTableProps {
   players: Player[]
