@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getDatabase, isDatabaseAvailable } from '../../../lib/db'
 
-// Configuração para forçar renderização dinâmica
+// Configuração para forçar renderização dinâmica - desabilitar SSG completamente
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
 
 // GET - Buscar ranking dos jogadores
 export async function GET() {
