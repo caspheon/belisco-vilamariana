@@ -5,14 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Trophy, Medal, Target, RefreshCw } from "lucide-react"
 import { Button } from "./ui/button"
-import type { Player } from "../lib/types"
-
-interface RankingPlayer extends Player {
-  total_matches: number
-  total_wins: number
-  total_losses: number
-  win_rate: number
-}
+import type { RankingPlayer } from "../lib/types"
 
 interface RankingTableProps {
   onRefresh: () => void

@@ -3,10 +3,7 @@
 export interface Player {
   id: number;
   name: string;
-  matches: number;
-  wins: number;
-  losses: number;
-  rating: number;
+  created_at: string;
 }
 
 export interface Match {
@@ -22,8 +19,8 @@ export interface CreatePlayer {
 
 export interface CreateMatch {
   title: string;
-  players: number[];
-  winner: number;
+  player1Id: number;
+  player2Id: number;
 }
 
 export interface MatchResult {
@@ -32,4 +29,12 @@ export interface MatchResult {
   player_id: number;
   position: number;
   created_at: string;
+}
+
+// Tipos para o ranking
+export interface RankingPlayer extends Player {
+  total_matches: number;
+  total_wins: number;
+  total_losses: number;
+  win_rate: number;
 }
