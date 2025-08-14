@@ -7,97 +7,97 @@ import { Users, Trophy, Target, ExternalLink } from "lucide-react"
 import { PlayerManager } from "@/components/player-manager"
 import { MatchCreator } from "@/components/match-creator"
 import { RankingTable } from "@/components/ranking-table"
-
-export interface Player {
-  id: string
-  name: string
-  matches: number
-  wins: number
-  losses: number
-  rating: number
-}
-
-export interface Match {
-  id: string
-  type: "individual" | "dupla"
-  players: string[]
-  winner: string
-  date: string
-}
+import type { Player, Match, CreatePlayer, CreateMatch } from "@/lib/types"
+import { getAllPlayers, createPlayer, getAllMatches, createMatch, getRanking } from "@/lib/db-functions"
 
 export default function SinucaManager() {
   const [players, setPlayers] = useState<Player[]>([])
   const [matches, setMatches] = useState<Match[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Load data from localStorage on mount
+  // Load data from database on mount
   useEffect(() => {
-    const savedPlayers = localStorage.getItem("sinuca-players")
-    const savedMatches = localStorage.getItem("sinuca-matches")
-
-    if (savedPlayers) {
-      setPlayers(JSON.parse(savedPlayers))
-    }
-    if (savedMatches) {
-      setMatches(JSON.parse(savedMatches))
-    }
+    loadData()
   }, [])
 
-  // Save to localStorage whenever data changes
-  useEffect(() => {
-    localStorage.setItem("sinuca-players", JSON.stringify(players))
-  }, [players])
-
-  useEffect(() => {
-    localStorage.setItem("sinuca-matches", JSON.stringify(matches))
-  }, [matches])
-
-  const addPlayer = (name: string) => {
-    const newPlayer: Player = {
-      id: Date.now().toString(),
-      name,
-      matches: 0,
-      wins: 0,
-      losses: 0,
-      rating: 1000,
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const [playersData, matchesData] = await Promise.all([
+        getAllPlayers(),
+        getAllMatches()
+      ])
+      
+      setPlayers(playersData)
+      setMatches(matchesData)
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err)
+      setError('Erro ao conectar com o banco de dados. Verifique a configuração.')
+    } finally {
+      setLoading(false)
     }
-    setPlayers((prev) => [...prev, newPlayer])
   }
 
-  const addMatch = (match: Omit<Match, "id" | "date">) => {
-    const newMatch: Match = {
-      ...match,
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
+  const addPlayer = async (name: string) => {
+    try {
+      setError(null)
+      const newPlayer = await createPlayer({ name })
+      setPlayers(prev => [...prev, newPlayer])
+    } catch (err) {
+      console.error('Erro ao adicionar jogador:', err)
+      setError('Erro ao adicionar jogador. Tente novamente.')
     }
+  }
 
-    setMatches((prev) => [...prev, newMatch])
-
-    // Update player statistics
-    setPlayers((prev) =>
-      prev.map((player) => {
-        if (match.players.includes(player.id)) {
-          const isWinner = player.id === match.winner
-          const newMatches = player.matches + 1
-          const newWins = isWinner ? player.wins + 1 : player.wins
-          const newLosses = isWinner ? player.losses : player.losses + 1
-          const winRate = newWins / newMatches
-          const newRating = Math.round(1000 + (winRate - 0.5) * 400 + newWins * 10)
-
-          return {
-            ...player,
-            matches: newMatches,
-            wins: newWins,
-            losses: newLosses,
-            rating: newRating,
-          }
-        }
-        return player
-      }),
-    )
+  const addMatch = async (match: Omit<CreateMatch, "title">) => {
+    try {
+      setError(null)
+      const title = `Partida ${new Date().toLocaleDateString('pt-BR')}`
+      const newMatch = await createMatch({ ...match, title })
+      setMatches(prev => [...prev, newMatch])
+      
+      // Recarregar dados para atualizar estatísticas
+      await loadData()
+    } catch (err) {
+      console.error('Erro ao criar partida:', err)
+      setError('Erro ao criar partida. Tente novamente.')
+    }
   }
 
   const totalMatches = matches.length
   const totalPlayers = players.length
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-400 mx-auto mb-4"></div>
+          <p className="text-green-400 text-xl">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-red-400 text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-red-400 mb-4">Erro de Conexão</h1>
+          <p className="text-gray-300 mb-6">{error}</p>
+          <button
+            onClick={loadData}
+            className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg transition-colors"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950 flex flex-col">

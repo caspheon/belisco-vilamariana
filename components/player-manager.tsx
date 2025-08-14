@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Plus, User } from "lucide-react"
-import type { Player } from "@/app/page"
+import type { Player } from "@/lib/types"
 
 interface PlayerManagerProps {
   players: Player[]
@@ -40,7 +40,7 @@ export function PlayerManager({ players, onAddPlayer }: PlayerManagerProps) {
             <Plus className="h-5 w-5 text-green-400" />🎱 Adicionar Novo Jogador
           </CardTitle>
           <CardDescription className="text-gray-200">
-            Digite o nome do jogador para adicioná-lo ao sistema
+            Digite apenas o nome do jogador para adicioná-lo ao sistema
           </CardDescription>
         </CardHeader>
         <CardContent>

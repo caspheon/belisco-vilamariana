@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trophy, Medal, Award, TrendingUp } from "lucide-react"
-import type { Player, Match } from "@/app/page"
+import type { Player, Match } from "@/lib/types"
 
 interface RankingTableProps {
   players: Player[]
@@ -142,8 +142,10 @@ export function RankingTable({ players, matches }: RankingTableProps) {
                 .slice(-5)
                 .reverse()
                 .map((match) => {
-                  const winner = players.find((p) => p.id === match.winner)
-                  const matchPlayers = match.players.map((id) => players.find((p) => p.id === id)).filter(Boolean)
+                  // Buscar informações dos jogadores da partida
+                  const matchParticipants = players.filter(player => 
+                    player.matches > 0 // Apenas jogadores que já jogaram
+                  )
 
                   return (
                     <div
@@ -157,21 +159,15 @@ export function RankingTable({ players, matches }: RankingTableProps) {
                               variant="outline"
                               className="border-green-400/70 text-green-400 bg-green-400/10 shadow-sm"
                             >
-                              {match.type === "individual" ? "Individual" : "Dupla"}
+                              Individual
                             </Badge>
                             <span className="text-sm text-gray-300 font-medium">
-                              {new Date(match.date).toLocaleDateString("pt-BR")}
+                              {new Date(match.match_date).toLocaleDateString("pt-BR")}
                             </span>
                           </div>
                           <div className="text-sm">
-                            <span className="font-semibold text-green-400 drop-shadow-sm">{winner?.name}</span>
-                            <span className="text-gray-200"> venceu contra </span>
-                            <span className="text-gray-100 font-medium">
-                              {matchPlayers
-                                .filter((p) => p?.id !== match.winner)
-                                .map((p) => p?.name)
-                                .join(", ")}
-                            </span>
+                            <span className="text-gray-200">Partida: </span>
+                            <span className="text-gray-100 font-medium">{match.title}</span>
                           </div>
                         </div>
                         <Trophy className="h-5 w-5 text-yellow-400 drop-shadow-sm" />

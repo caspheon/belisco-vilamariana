@@ -3,227 +3,146 @@ import type {
   Player, 
   Match, 
   MatchResult, 
-  PlayerStats, 
   CreatePlayer, 
-  CreateMatch, 
-  CreateMatchResult,
-  RankingEntry 
+  CreateMatch 
 } from './types';
 
 // ===== FUNÇÕES DE JOGADORES =====
 
 export async function getAllPlayers(): Promise<Player[]> {
-  return await sql`
-    SELECT * FROM players 
-    WHERE is_active = true 
-    ORDER BY name
+  const players = await sql`
+    SELECT 
+      p.id,
+      p.name,
+      COALESCE(stats.total_matches, 0) as matches,
+      COALESCE(stats.total_wins, 0) as wins,
+      COALESCE(stats.total_losses, 0) as losses
+    FROM players p
+    LEFT JOIN LATERAL get_player_stats(p.id) stats ON true
+    ORDER BY p.name
   `;
+  
+  return players.map(player => ({
+    ...player,
+    rating: calculateRating(player.wins, player.matches)
+  }));
 }
 
 export async function getPlayerById(id: number): Promise<Player | null> {
   const result = await sql`
-    SELECT * FROM players 
-    WHERE id = ${id} AND is_active = true
+    SELECT 
+      p.id,
+      p.name,
+      COALESCE(stats.total_matches, 0) as matches,
+      COALESCE(stats.total_wins, 0) as wins,
+      COALESCE(stats.total_losses, 0) as losses
+    FROM players p
+    LEFT JOIN LATERAL get_player_stats(p.id) stats ON true
+    WHERE p.id = ${id}
   `;
-  return result[0] || null;
+  
+  if (result.length === 0) return null;
+  
+  const player = result[0];
+  return {
+    ...player,
+    rating: calculateRating(player.wins, player.matches)
+  };
 }
 
 export async function createPlayer(player: CreatePlayer): Promise<Player> {
   const result = await sql`
-    INSERT INTO players (name, email, phone)
-    VALUES (${player.name}, ${player.email}, ${player.phone})
-    RETURNING *
+    INSERT INTO players (name)
+    VALUES (${player.name})
+    RETURNING id, name
   `;
-  return result[0];
-}
-
-export async function updatePlayer(id: number, updates: Partial<CreatePlayer>): Promise<Player | null> {
-  const result = await sql`
-    UPDATE players 
-    SET 
-      name = COALESCE(${updates.name}, name),
-      email = COALESCE(${updates.email}, email),
-      phone = COALESCE(${updates.phone}, phone)
-    WHERE id = ${id} AND is_active = true
-    RETURNING *
-  `;
-  return result[0] || null;
-}
-
-export async function deletePlayer(id: number): Promise<boolean> {
-  const result = await sql`
-    UPDATE players 
-    SET is_active = false 
-    WHERE id = ${id}
-    RETURNING id
-  `;
-  return result.length > 0;
+  
+  return {
+    ...result[0],
+    matches: 0,
+    wins: 0,
+    losses: 0,
+    rating: 1000
+  };
 }
 
 // ===== FUNÇÕES DE PARTIDAS =====
 
 export async function getAllMatches(): Promise<Match[]> {
   return await sql`
-    SELECT * FROM matches 
-    ORDER BY match_date DESC, created_at DESC
+    SELECT 
+      m.id,
+      m.title,
+      m.match_date,
+      m.created_at
+    FROM matches m
+    ORDER BY m.match_date DESC, m.created_at DESC
   `;
-}
-
-export async function getMatchById(id: number): Promise<Match | null> {
-  const result = await sql`
-    SELECT * FROM matches 
-    WHERE id = ${id}
-  `;
-  return result[0] || null;
 }
 
 export async function createMatch(match: CreateMatch): Promise<Match> {
-  const result = await sql`
-    INSERT INTO matches (title, match_date, match_time, location, max_players, min_players, created_by)
-    VALUES (${match.title}, ${match.match_date}, ${match.match_time}, ${match.location}, ${match.max_players || 4}, ${match.min_players || 2}, ${match.created_by})
-    RETURNING *
+  // Inserir a partida
+  const matchResult = await sql`
+    INSERT INTO matches (title, match_date)
+    VALUES (${match.title}, CURRENT_DATE)
+    RETURNING id, title, match_date, created_at
   `;
-  return result[0];
-}
-
-export async function updateMatchStatus(id: number, status: Match['status']): Promise<Match | null> {
-  const result = await sql`
-    UPDATE matches 
-    SET status = ${status}
-    WHERE id = ${id}
-    RETURNING *
-  `;
-  return result[0] || null;
-}
-
-// ===== FUNÇÕES DE PARTICIPANTES =====
-
-export async function addPlayerToMatch(matchId: number, playerId: number): Promise<boolean> {
-  try {
+  
+  const newMatch = matchResult[0];
+  
+  // Inserir participantes
+  for (const playerId of match.players) {
     await sql`
       INSERT INTO match_participants (match_id, player_id)
-      VALUES (${matchId}, ${playerId})
-      ON CONFLICT (match_id, player_id) DO NOTHING
+      VALUES (${newMatch.id}, ${playerId})
     `;
-    return true;
-  } catch {
-    return false;
   }
-}
-
-export async function removePlayerFromMatch(matchId: number, playerId: number): Promise<boolean> {
-  const result = await sql`
-    DELETE FROM match_participants 
-    WHERE match_id = ${matchId} AND player_id = ${playerId}
-    RETURNING id
-  `;
-  return result.length > 0;
-}
-
-export async function getMatchParticipants(matchId: number) {
-  return await sql`
-    SELECT 
-      mp.*,
-      p.name as player_name,
-      p.email as player_email
-    FROM match_participants mp
-    JOIN players p ON mp.player_id = p.id
-    WHERE mp.match_id = ${matchId}
-    ORDER BY mp.joined_at
-  `;
-}
-
-// ===== FUNÇÕES DE RESULTADOS =====
-
-export async function addMatchResult(result: CreateMatchResult): Promise<MatchResult | null> {
-  try {
-    const dbResult = await sql`
-      INSERT INTO match_results (match_id, player_id, position, points, score)
-      VALUES (${result.match_id}, ${result.player_id}, ${result.position}, ${result.points || 0}, ${result.score || 0})
-      ON CONFLICT (match_id, player_id) 
-      DO UPDATE SET 
-        position = EXCLUDED.position,
-        points = EXCLUDED.points,
-        score = EXCLUDED.score
-      RETURNING *
+  
+  // Inserir resultados (vencedor = posição 1, perdedor = posição 2)
+  const winnerId = match.winner;
+  const loserId = match.players.find(id => id !== winnerId);
+  
+  if (loserId) {
+    await sql`
+      INSERT INTO match_results (match_id, player_id, position)
+      VALUES 
+        (${newMatch.id}, ${winnerId}, 1),
+        (${newMatch.id}, ${loserId}, 2)
     `;
-    return dbResult[0] || null;
-  } catch {
-    return null;
   }
-}
-
-export async function getMatchResults(matchId: number) {
-  return await sql`
-    SELECT 
-      mr.*,
-      p.name as player_name
-    FROM match_results mr
-    JOIN players p ON mr.player_id = p.id
-    WHERE mr.match_id = ${matchId}
-    ORDER BY mr.position
-  `;
+  
+  return newMatch;
 }
 
 // ===== FUNÇÕES DE ESTATÍSTICAS =====
 
-export async function getPlayerStats(playerId: number): Promise<PlayerStats | null> {
-  const result = await sql`
-    SELECT * FROM player_stats 
-    WHERE player_id = ${playerId}
-  `;
-  return result[0] || null;
-}
-
-export async function getRanking(): Promise<RankingEntry[]> {
-  return await sql`
+export async function getRanking(): Promise<Player[]> {
+  const players = await sql`
     SELECT 
-      ps.player_id,
-      p.name as player_name,
-      ps.total_matches,
-      ps.total_wins,
-      ps.total_points,
-      ps.best_position,
-      ps.average_position,
-      ROW_NUMBER() OVER (ORDER BY ps.total_wins DESC, ps.total_points DESC, ps.average_position ASC) as rank
-    FROM player_stats ps
-    JOIN players p ON ps.player_id = p.id
-    WHERE p.is_active = true
-    ORDER BY ps.total_wins DESC, ps.total_points DESC, ps.average_position ASC
+      p.id,
+      p.name,
+      COALESCE(stats.total_matches, 0) as matches,
+      COALESCE(stats.total_wins, 0) as wins,
+      COALESCE(stats.total_losses, 0) as losses
+    FROM players p
+    LEFT JOIN LATERAL get_player_stats(p.id) stats ON true
+    WHERE COALESCE(stats.total_matches, 0) > 0
+    ORDER BY 
+      COALESCE(stats.total_wins, 0) DESC,
+      COALESCE(stats.total_matches, 0) DESC,
+      p.name ASC
   `;
+  
+  return players.map(player => ({
+    ...player,
+    rating: calculateRating(player.wins, player.matches)
+  }));
 }
 
-// ===== FUNÇÕES DE RELATÓRIOS =====
+// ===== FUNÇÕES AUXILIARES =====
 
-export async function getPlayerHistory(playerId: number) {
-  return await sql`
-    SELECT 
-      m.title,
-      m.match_date,
-      mr.position,
-      mr.points,
-      mr.score
-    FROM match_results mr
-    JOIN matches m ON mr.match_id = m.id
-    WHERE mr.player_id = ${playerId}
-    ORDER BY m.match_date DESC
-  `;
-}
-
-export async function getUpcomingMatches(): Promise<Match[]> {
-  return await sql`
-    SELECT * FROM matches 
-    WHERE match_date >= CURRENT_DATE 
-    AND status = 'scheduled'
-    ORDER BY match_date ASC, match_time ASC
-  `;
-}
-
-export async function getRecentMatches(limit: number = 10): Promise<Match[]> {
-  return await sql`
-    SELECT * FROM matches 
-    WHERE status = 'completed'
-    ORDER BY match_date DESC, created_at DESC
-    LIMIT ${limit}
-  `;
+function calculateRating(wins: number, matches: number): number {
+  if (matches === 0) return 1000;
+  const winRate = wins / matches;
+  return Math.round(1000 + (winRate - 0.5) * 400 + wins * 10);
 }

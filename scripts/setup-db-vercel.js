@@ -1,3 +1,16 @@
+const { neon } = require('@neondatabase/serverless');
+
+// Verificar se a variável de ambiente está definida
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL não está definida nas variáveis de ambiente');
+  process.exit(1);
+}
+
+// Configuração do banco Neon
+const sql = neon(process.env.DATABASE_URL);
+
+// Schema simplificado para Sinu Cado Belisco
+const schema = `
 -- Schema simplificado para Sinu Cado Belisco
 -- Banco de dados: Neon PostgreSQL
 
@@ -60,3 +73,51 @@ BEGIN
     WHERE mr.player_id = player_id_param;
 END;
 $$ LANGUAGE plpgsql;
+`;
+
+async function setupDatabase() {
+  console.log('🔧 Configurando banco de dados para Vercel...');
+  
+  try {
+    // Executar o schema
+    await sql(schema);
+    console.log('✅ Schema do banco criado com sucesso!');
+    
+    // Testar a conexão
+    const result = await sql`SELECT 1 as test`;
+    console.log('✅ Conexão com banco de dados testada com sucesso!');
+    
+    // Verificar se as tabelas foram criadas
+    const tables = await sql`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name IN ('players', 'matches', 'match_participants', 'match_results')
+      ORDER BY table_name
+    `;
+    
+    console.log('📋 Tabelas criadas:', tables.map(t => t.table_name).join(', '));
+    
+    // Verificar se há jogadores (deve estar vazio)
+    const playerCount = await sql`SELECT COUNT(*) as count FROM players`;
+    console.log(`👥 Total de jogadores: ${playerCount[0].count} (banco limpo)`);
+    
+    // Verificar se há partidas (deve estar vazio)
+    const matchCount = await sql`SELECT COUNT(*) as count FROM matches`;
+    console.log(`🎱 Total de partidas: ${matchCount[0].count} (banco limpo)`);
+    
+    console.log('🎉 Banco de dados configurado com sucesso para o Vercel!');
+    console.log('✨ Banco está limpo e pronto para receber novos dados.');
+    
+  } catch (error) {
+    console.error('❌ Erro ao configurar banco de dados:', error);
+    process.exit(1);
+  }
+}
+
+// Executar se chamado diretamente
+if (require.main === module) {
+  setupDatabase();
+}
+
+module.exports = { setupDatabase };
