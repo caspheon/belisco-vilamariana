@@ -10,22 +10,14 @@ import type {
 // ===== FUNÇÕES DE JOGADORES =====
 
 export async function getAllPlayers(): Promise<Player[]> {
-  const players = await sql`
+  return await sql`
     SELECT 
-      p.id,
-      p.name,
-      COALESCE(stats.total_matches, 0) as matches,
-      COALESCE(stats.total_wins, 0) as wins,
-      COALESCE(stats.total_losses, 0) as losses
-    FROM players p
-    LEFT JOIN LATERAL get_player_stats(p.id) stats ON true
-    ORDER BY p.name
+      id,
+      name,
+      created_at
+    FROM players
+    ORDER BY name
   `;
-  
-  return players.map((player: any) => ({
-    ...player,
-    rating: calculateRating(player.wins, player.matches)
-  }));
 }
 
 export async function getPlayerById(id: number): Promise<Player | null> {
@@ -54,16 +46,10 @@ export async function createPlayer(player: CreatePlayer): Promise<Player> {
   const result = await sql`
     INSERT INTO players (name)
     VALUES (${player.name})
-    RETURNING id, name
+    RETURNING id, name, created_at
   `;
   
-  return {
-    ...result[0],
-    matches: 0,
-    wins: 0,
-    losses: 0,
-    rating: 1000
-  };
+  return result[0];
 }
 
 // ===== FUNÇÕES DE PARTIDAS =====
@@ -91,25 +77,23 @@ export async function createMatch(match: CreateMatch): Promise<Match> {
   const newMatch = matchResult[0];
   
   // Inserir participantes
-  for (const playerId of match.players) {
-    await sql`
-      INSERT INTO match_participants (match_id, player_id)
-      VALUES (${newMatch.id}, ${playerId})
-    `;
-  }
+  await sql`
+    INSERT INTO match_participants (match_id, player_id)
+    VALUES (${newMatch.id}, ${match.player1Id})
+  `;
   
-  // Inserir resultados (vencedor = posição 1, perdedor = posição 2)
-  const winnerId = match.winner;
-  const loserId = match.players.find(id => id !== winnerId);
+  await sql`
+    INSERT INTO match_participants (match_id, player_id)
+    VALUES (${newMatch.id}, ${match.player2Id})
+  `;
   
-  if (loserId) {
-    await sql`
-      INSERT INTO match_results (match_id, player_id, position)
-      VALUES 
-        (${newMatch.id}, ${winnerId}, 1),
-        (${newMatch.id}, ${loserId}, 2)
-    `;
-  }
+  // Inserir resultados (player1Id vence = posição 1, player2Id perde = posição 2)
+  await sql`
+    INSERT INTO match_results (match_id, player_id, position)
+    VALUES 
+      (${newMatch.id}, ${match.player1Id}, 1),
+      (${newMatch.id}, ${match.player2Id}, 2)
+  `;
   
   return newMatch;
 }
@@ -121,12 +105,12 @@ export async function getRanking(): Promise<Player[]> {
     SELECT 
       p.id,
       p.name,
+      p.created_at,
       COALESCE(stats.total_matches, 0) as matches,
       COALESCE(stats.total_wins, 0) as wins,
       COALESCE(stats.total_losses, 0) as losses
     FROM players p
     LEFT JOIN LATERAL get_player_stats(p.id) stats ON true
-    WHERE COALESCE(stats.total_matches, 0) > 0
     ORDER BY 
       COALESCE(stats.total_wins, 0) DESC,
       COALESCE(stats.total_matches, 0) DESC,
@@ -134,8 +118,13 @@ export async function getRanking(): Promise<Player[]> {
   `;
   
   return players.map((player: any) => ({
-    ...player,
-    rating: calculateRating(player.wins, player.matches)
+    id: player.id,
+    name: player.name,
+    created_at: player.created_at,
+    matches: player.matches || 0,
+    wins: player.wins || 0,
+    losses: player.losses || 0,
+    rating: calculateRating(player.wins || 0, player.matches || 0)
   }));
 }
 

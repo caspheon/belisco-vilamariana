@@ -4,6 +4,11 @@ export interface Player {
   id: number;
   name: string;
   created_at: string;
+  // Campos opcionais para compatibilidade
+  matches?: number;
+  wins?: number;
+  losses?: number;
+  rating?: number;
 }
 
 export interface Match {
