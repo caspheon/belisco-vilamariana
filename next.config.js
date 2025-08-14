@@ -3,7 +3,6 @@ const nextConfig = {
   // Configurações otimizadas para Vercel
   output: 'standalone',
   experimental: {
-    // Removendo appDir pois já é padrão no Next.js 14
     // Desabilitar completamente a coleta de dados estáticos
     workerThreads: false,
     cpus: 1
@@ -15,7 +14,7 @@ const nextConfig = {
   },
   // Forçar renderização dinâmica
   staticPageGenerationTimeout: 0,
-  // Configuração para evitar execução de API routes durante build
+  // Configuração para evitar execução de módulos durante build
   webpack: (config, { isServer, dev }) => {
     if (isServer && !dev) {
       // Em produção, desabilitar completamente módulos de banco
@@ -36,20 +35,6 @@ const nextConfig = {
   // Configuração adicional para evitar SSG
   images: {
     unoptimized: true
-  },
-  // Forçar todas as páginas a serem dinâmicas
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, must-revalidate'
-          }
-        ]
-      }
-    ]
   }
 }
 
