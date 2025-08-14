@@ -12,7 +12,7 @@ import type { Player, Match } from "../../lib/types"
 
 interface MatchCreatorProps {
   players: Player[]
-  onAddMatch: (match: Omit<Match, "id" | "date">) => void
+  onAddMatch: (match: CreateMatch) => void
 }
 
 export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
