@@ -12,12 +12,6 @@ const nextConfig = {
   },
   // Forçar renderização dinâmica
   staticPageGenerationTimeout: 0,
-  // Desabilitar coleta de dados estáticos
-  generateStaticParams: false,
-  // Forçar todas as rotas a serem dinâmicas
-  dynamicParams: true,
-  // Desabilitar otimizações estáticas
-  optimizePackageImports: false,
   // Configuração para evitar execução de API routes durante build
   webpack: (config, { isServer }) => {
     if (isServer) {
