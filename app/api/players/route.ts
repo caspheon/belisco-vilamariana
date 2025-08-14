@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDatabase, isDatabaseAvailable } from '../../../lib/db'
-
-// Forçar renderização dinâmica - desabilitar SSG
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+import './route.config'
 
 // GET - Listar todos os jogadores
 export async function GET() {
