@@ -17,7 +17,7 @@
     "db:setup-vercel": "node scripts/setup-db-vercel.js",
     "db:reset-vercel": "node scripts/reset-db-vercel.js",
     "db:fresh-vercel": "node scripts/fresh-db-vercel.js",
-    "vercel-build": "npm run db:setup-vercel && next build"
+    "vercel-build": "next build"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.0",
