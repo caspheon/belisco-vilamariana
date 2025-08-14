@@ -22,7 +22,7 @@ export async function getAllPlayers(): Promise<Player[]> {
     ORDER BY p.name
   `;
   
-  return players.map(player => ({
+  return players.map((player: any) => ({
     ...player,
     rating: calculateRating(player.wins, player.matches)
   }));
@@ -133,7 +133,7 @@ export async function getRanking(): Promise<Player[]> {
       p.name ASC
   `;
   
-  return players.map(player => ({
+  return players.map((player: any) => ({
     ...player,
     rating: calculateRating(player.wins, player.matches)
   }));
