@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Users, Trophy, Target, ExternalLink } from "lucide-react"
-import { PlayerManager } from "@/components/player-manager"
-import { MatchCreator } from "@/components/match-creator"
-import { RankingTable } from "@/components/ranking-table"
-import type { Player, Match, CreatePlayer, CreateMatch } from "@/lib/types"
-import { getAllPlayers, createPlayer, getAllMatches, createMatch, getRanking } from "@/lib/db-functions"
+import { PlayerManager } from "../components/player-manager"
+import { MatchCreator } from "../components/match-creator"
+import { RankingTable } from "../components/ranking-table"
+import type { Player, Match, CreatePlayer, CreateMatch } from "../lib/types"
+import { getAllPlayers, createPlayer, getAllMatches, createMatch, getRanking } from "../lib/db-functions"
 
 export default function SinucaManager() {
   const [players, setPlayers] = useState<Player[]>([])
