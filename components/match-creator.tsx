@@ -1,181 +1,220 @@
 "use client"
 
 import { useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
-import { Label } from "./ui/label"
 import { Badge } from "./ui/badge"
-import { GamepadIcon, User, Trophy } from "lucide-react"
+import { Target, Users, Trophy, RefreshCw } from "lucide-react"
 import type { Player, CreateMatch } from "../lib/types"
 
 interface MatchCreatorProps {
   players: Player[]
   onAddMatch: (match: Omit<CreateMatch, "title">) => void
+  onRefresh: () => void
 }
 
-export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
-  const [player1, setPlayer1] = useState<string>("")
-  const [player2, setPlayer2] = useState<string>("")
-  const [winner, setWinner] = useState<string>("")
+export function MatchCreator({ players, onAddMatch, onRefresh }: MatchCreatorProps) {
+  const [player1Id, setPlayer1Id] = useState<string>("")
+  const [player2Id, setPlayer2Id] = useState<string>("")
+  const [isCreating, setIsCreating] = useState(false)
 
-  const handleCreateMatch = () => {
-    if (player1 && player2 && winner && (winner === player1 || winner === player2)) {
-      onAddMatch({
-        players: [parseInt(player1), parseInt(player2)],
-        winner: parseInt(winner),
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!player1Id || !player2Id || player1Id === player2Id || isCreating) return
+
+    setIsCreating(true)
+    try {
+      await onAddMatch({
+        player1Id: parseInt(player1Id),
+        player2Id: parseInt(player2Id)
       })
-
+      
       // Reset form
-      setPlayer1("")
-      setPlayer2("")
-      setWinner("")
+      setPlayer1Id("")
+      setPlayer2Id("")
+    } finally {
+      setIsCreating(false)
     }
   }
 
-  const canCreateMatch = player1 && player2 && winner && (winner === player1 || winner === player2)
+  const handleRefresh = () => {
+    onRefresh()
+  }
+
+  const canCreateMatch = player1Id && player2Id && player1Id !== player2Id && !isCreating
 
   if (players.length < 2) {
     return (
-      <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="w-5 h-5" />
+            Criar Nova Partida
+          </CardTitle>
+        </CardHeader>
         <CardContent className="text-center py-8">
-          <GamepadIcon className="h-12 w-12 mx-auto mb-4 opacity-50 text-gray-400" />
-          <p className="text-gray-200">Você precisa de pelo menos 2 jogadores cadastrados para criar uma partida.</p>
+          <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-lg font-medium mb-2">Jogadores insuficientes</p>
+          <p className="text-sm text-gray-500 mb-4">
+            Você precisa de pelo menos 2 jogadores para criar uma partida
+          </p>
+          <p className="text-sm text-gray-400">
+            Atualmente: {players.length} jogador{players.length !== 1 ? 'es' : ''}
+          </p>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-green-400 drop-shadow-sm">
-            <GamepadIcon className="h-5 w-5 text-green-400" />🎱 Nova Partida Individual (1v1)
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Target className="w-5 h-5" />
+            Criar Nova Partida
           </CardTitle>
-          <CardDescription className="text-gray-200">Configure uma nova partida de sinuca entre dois jogadores</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Player Selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Player 1 */}
-            <div className="space-y-3">
-              <Label className="text-base font-medium text-green-400 drop-shadow-sm">
-                <User className="h-4 w-4 inline mr-2" />Jogador 1
-              </Label>
-              <Select
-                value={player1}
-                onValueChange={(value) => {
-                  setPlayer1(value)
-                  if (winner === value) setWinner("")
-                }}
-              >
-                <SelectTrigger className="bg-gray-700/90 border-gray-500 text-white hover:border-green-400 focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-200 shadow-inner">
-                  <SelectValue placeholder="Selecione o jogador 1" className="text-gray-300" />
+          <Button onClick={handleRefresh} size="sm" variant="outline">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Formulário para criar partida */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Jogador 1 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                🎯 Jogador 1 (Vencedor)
+              </label>
+              <Select value={player1Id} onValueChange={setPlayer1Id}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o primeiro jogador" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-700/95 border-gray-600 shadow-xl backdrop-blur-sm">
-                  {players
-                    .filter((player) => player.id.toString() !== player2)
-                    .map((player) => (
-                      <SelectItem
-                        key={player.id}
-                        value={player.id.toString()}
-                        className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span>{player.name}</span>
-                          <Badge
-                            variant="outline"
-                            className="ml-2 border-green-400/70 text-green-400 bg-green-400/10"
-                          >
-                            {player.rating}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
+                <SelectContent>
+                  {players.map((player) => (
+                    <SelectItem key={player.id} value={player.id.toString()}>
+                      {player.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Player 2 */}
-            <div className="space-y-3">
-              <Label className="text-base font-medium text-green-400 drop-shadow-sm">
-                <User className="h-4 w-4 inline mr-2" />Jogador 2
-              </Label>
-              <Select
-                value={player2}
-                onValueChange={(value) => {
-                  setPlayer2(value)
-                  if (winner === value) setWinner("")
-                }}
-              >
-                <SelectTrigger className="bg-gray-700/90 border-gray-500 text-white hover:border-green-400 focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-200 shadow-inner">
-                  <SelectValue placeholder="Selecione o jogador 2" className="text-gray-300" />
+            {/* Jogador 2 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                🎯 Jogador 2 (Perdedor)
+              </label>
+              <Select value={player2Id} onValueChange={setPlayer2Id}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o segundo jogador" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-700/95 border-gray-600 shadow-xl backdrop-blur-sm">
-                  {players
-                    .filter((player) => player.id.toString() !== player1)
-                    .map((player) => (
-                      <SelectItem
-                        key={player.id}
-                        value={player.id.toString()}
-                        className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span>{player.name}</span>
-                          <Badge
-                            variant="outline"
-                            className="ml-2 border-green-400/70 text-green-400 bg-green-400/10"
-                          >
-                            {player.rating}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
+                <SelectContent>
+                  {players.map((player) => (
+                    <SelectItem key={player.id} value={player.id.toString()}>
+                      {player.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Winner Selection */}
-          {player1 && player2 && (
-            <div className="space-y-3 p-4 bg-gray-700/30 rounded-lg border border-gray-600/30">
-              <Label className="text-base font-medium flex items-center gap-2 text-green-400 drop-shadow-sm">
-                <Trophy className="h-4 w-4 text-yellow-400" />🏆 Vencedor da Partida
-              </Label>
-              <Select value={winner} onValueChange={setWinner}>
-                <SelectTrigger className="bg-gray-700/90 border-gray-500 text-white hover:border-green-400 focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-200 shadow-inner">
-                  <SelectValue placeholder="Selecione o vencedor" className="text-gray-300" />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-700/95 border-gray-600 shadow-xl backdrop-blur-sm">
-                  {[player1, player2].map((playerId) => {
-                    const player = players.find((p) => p.id.toString() === playerId)
-                    return player ? (
-                      <SelectItem
-                        key={player.id}
-                        value={playerId}
-                        className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
-                      >
-                        {player.name}
-                      </SelectItem>
-                    ) : null
-                  })}
-                </SelectContent>
-              </Select>
+          {/* Validações */}
+          {player1Id && player2Id && player1Id === player2Id && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm">
+                ❌ Os jogadores devem ser diferentes
+              </p>
             </div>
           )}
 
-          {/* Create Match Button */}
-          <Button
-            onClick={handleCreateMatch}
+          {/* Botão de criação */}
+          <Button 
+            type="submit" 
             disabled={!canCreateMatch}
-            className="w-full bg-green-600 hover:bg-green-500 shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg py-6"
-            size="lg"
+            className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50"
           >
-            <Trophy className="h-5 w-5 mr-2" />🎯 Registrar Partida
+            {isCreating ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Criando Partida...
+              </>
+            ) : (
+              <>
+                <Trophy className="w-4 h-4 mr-2" />
+                Criar Partida
+              </>
+            )}
           </Button>
-        </CardContent>
-      </Card>
-    </div>
+        </form>
+
+        {/* Informações da partida */}
+        {canCreateMatch && (
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h4 className="font-semibold text-blue-800 mb-2">📋 Resumo da Partida</h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-blue-600 font-medium">Vencedor:</span>
+                <span className="text-gray-700">
+                  {players.find(p => p.id.toString() === player1Id)?.name}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-blue-600 font-medium">Perdedor:</span>
+                <span className="text-gray-700">
+                  {players.find(p => p.id.toString() === player2Id)?.name}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-blue-600 font-medium">Data:</span>
+                <span className="text-gray-700">
+                  {new Date().toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-blue-600 font-medium">Tipo:</span>
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  Individual
+                </Badge>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Estatísticas */}
+        <div className="p-4 bg-gray-50 rounded-lg border">
+          <h4 className="font-semibold text-gray-700 mb-2">📊 Estatísticas</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-gray-600 font-medium">Total de Jogadores:</span>
+              <span className="ml-2 text-gray-700">{players.length}</span>
+            </div>
+            <div>
+              <span className="text-gray-600 font-medium">Jogadores Disponíveis:</span>
+              <span className="ml-2 text-gray-700">
+                {players.length >= 2 ? `${players.length} jogadores` : "Insuficientes"}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-600 font-medium">Partidas Possíveis:</span>
+              <span className="ml-2 text-gray-700">
+                {players.length >= 2 ? Math.floor((players.length * (players.length - 1)) / 2) : 0}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-600 font-medium">Última Atualização:</span>
+              <span className="ml-2 text-gray-700">
+                {new Date().toLocaleTimeString('pt-BR')}
+              </span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

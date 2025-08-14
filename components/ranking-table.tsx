@@ -1,184 +1,225 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
-import { Trophy, Medal, Award, TrendingUp } from "lucide-react"
-import type { Player, Match } from "../lib/types"
+import { Trophy, Medal, Target, RefreshCw } from "lucide-react"
+import { Button } from "./ui/button"
+import type { Player } from "../lib/types"
 
-interface RankingTableProps {
-  players: Player[]
-  matches: Match[]
+interface RankingPlayer extends Player {
+  total_matches: number
+  total_wins: number
+  total_losses: number
+  win_rate: number
 }
 
-export function RankingTable({ players, matches }: RankingTableProps) {
-  const sortedPlayers = [...players].sort((a, b) => {
-    // Sort by rating first, then by win rate, then by total wins
-    if (b.rating !== a.rating) return b.rating - a.rating
+interface RankingTableProps {
+  onRefresh: () => void
+}
 
-    const aWinRate = a.matches > 0 ? a.wins / a.matches : 0
-    const bWinRate = b.matches > 0 ? b.wins / b.matches : 0
+export function RankingTable({ onRefresh }: RankingTableProps) {
+  const [ranking, setRanking] = useState<RankingPlayer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-    if (bWinRate !== aWinRate) return bWinRate - aWinRate
-
-    return b.wins - a.wins
-  })
-
-  const getRankIcon = (position: number) => {
-    switch (position) {
-      case 1:
-        return <Trophy className="h-5 w-5 text-yellow-400 drop-shadow-sm" />
-      case 2:
-        return <Medal className="h-5 w-5 text-gray-300 drop-shadow-sm" />
-      case 3:
-        return <Award className="h-5 w-5 text-amber-500 drop-shadow-sm" />
-      default:
-        return (
-          <span className="h-5 w-5 flex items-center justify-center text-sm font-bold text-gray-300 bg-gray-600/50 rounded-full">
-            {position}
-          </span>
-        )
+  const loadRanking = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const response = await fetch('/api/ranking')
+      if (!response.ok) {
+        throw new Error('Erro ao carregar ranking')
+      }
+      
+      const data = await response.json()
+      setRanking(data)
+    } catch (err) {
+      console.error('Erro ao carregar ranking:', err)
+      setError('Erro ao carregar ranking')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const getRatingColor = (rating: number) => {
-    if (rating >= 1200) return "bg-yellow-600/90 text-yellow-100 shadow-md"
-    if (rating >= 1100) return "bg-green-600/90 text-green-100 shadow-md"
-    if (rating >= 1000) return "bg-blue-600/90 text-blue-100 shadow-md"
-    return "bg-gray-600/90 text-gray-100 shadow-md"
+  useEffect(() => {
+    loadRanking()
+  }, [])
+
+  const handleRefresh = async () => {
+    await loadRanking()
+    onRefresh()
   }
 
-  if (players.length === 0) {
+  if (loading) {
     return (
-      <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="w-5 h-5" />
+            Ranking dos Jogadores
+          </CardTitle>
+        </CardHeader>
         <CardContent className="text-center py-8">
-          <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50 text-gray-400" />
-          <p className="text-gray-200">Nenhum jogador cadastrado ainda.</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando ranking...</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="w-5 h-5" />
+            Ranking dos Jogadores
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <div className="text-red-600 mb-4">❌ {error}</div>
+          <Button onClick={handleRefresh} variant="outline">
+            Tentar Novamente
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (ranking.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="w-5 h-5" />
+            Ranking dos Jogadores
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <Target className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600 mb-4">Nenhum jogador encontrado</p>
+          <p className="text-sm text-gray-500">
+            Adicione jogadores e crie partidas para ver o ranking
+          </p>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-green-400 drop-shadow-sm">
-            <Trophy className="h-5 w-5 text-green-400" />🏆 Ranking de Jogadores
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="w-5 h-5" />
+            Ranking dos Jogadores
           </CardTitle>
-          <CardDescription className="text-gray-200">
-            Classificação baseada no rating e desempenho nas partidas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {sortedPlayers.map((player, index) => {
-              const position = index + 1
-              const winRate = player.matches > 0 ? (player.wins / player.matches) * 100 : 0
-
-              return (
-                <div
-                  key={player.id}
-                  className={`p-4 rounded-lg border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
-                    position <= 3
-                      ? "bg-gradient-to-r from-yellow-900/40 to-amber-900/40 border-yellow-500/50 shadow-lg"
-                      : "bg-gradient-to-r from-gray-700/60 to-gray-800/60 border-gray-600/50 hover:border-green-400/30"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center justify-center w-10 h-10 bg-gray-700/50 rounded-full">
-                        {getRankIcon(position)}
-                      </div>
-
-                      <div>
-                        <h3 className="font-semibold text-lg text-green-400 drop-shadow-sm">{player.name}</h3>
-                        <div className="flex items-center gap-2 text-sm text-gray-200">
-                          <span>{player.matches} partidas</span>
-                          <span className="text-gray-400">•</span>
-                          <span className="text-green-400 font-medium">{player.wins}V</span>
-                          <span className="text-gray-400">•</span>
-                          <span className="text-red-400 font-medium">{player.losses}D</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right space-y-2">
-                      <Badge className={getRatingColor(player.rating)}>{player.rating} pts</Badge>
-                      <div className="text-sm text-gray-200 font-medium">{winRate.toFixed(1)}% vitórias</div>
-                    </div>
-                  </div>
-
-                  {/* Progress bar for win rate */}
-                  <div className="mt-4">
-                    <div className="flex justify-between text-xs text-gray-300 mb-2">
-                      <span className="font-medium">Taxa de vitória</span>
-                      <span className="font-bold">{winRate.toFixed(1)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-600/70 rounded-full h-2.5 shadow-inner">
-                      <div
-                        className="bg-gradient-to-r from-green-500 to-emerald-400 h-2.5 rounded-full transition-all duration-500 shadow-sm"
-                        style={{ width: `${Math.min(winRate, 100)}%` }}
-                      />
-                    </div>
-                  </div>
+          <Button onClick={handleRefresh} size="sm" variant="outline">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {ranking.map((player, index) => (
+            <div
+              key={player.id}
+              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center gap-4">
+                {/* Posição */}
+                <div className="flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm">
+                  {index === 0 && (
+                    <Trophy className="w-5 h-5 text-yellow-500" />
+                  )}
+                  {index === 1 && (
+                    <Medal className="w-5 h-5 text-gray-400" />
+                  )}
+                  {index === 2 && (
+                    <Medal className="w-5 h-5 text-amber-600" />
+                  )}
+                  {index > 2 && (
+                    <span className="bg-gray-500 w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                      {index + 1}
+                    </span>
+                  )}
                 </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Recent Matches */}
-      {matches.length > 0 && (
-        <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-green-400 drop-shadow-sm">
-              <TrendingUp className="h-5 w-5 text-green-400" />📊 Partidas Recentes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {matches
-                .slice(-5)
-                .reverse()
-                .map((match) => {
-                  // Buscar informações dos jogadores da partida
-                  const matchParticipants = players.filter(player => 
-                    player.matches > 0 // Apenas jogadores que já jogaram
-                  )
+                {/* Nome do jogador */}
+                <div>
+                  <h3 className="font-semibold text-gray-900">{player.name}</h3>
+                  <p className="text-sm text-gray-500">
+                    Jogador desde {new Date(player.created_at).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              </div>
 
-                  return (
-                    <div
-                      key={match.id}
-                      className="p-4 border border-gray-600/50 rounded-lg bg-gradient-to-r from-gray-700/50 to-slate-700/50 hover:from-gray-600/50 hover:to-slate-600/50 transition-all duration-300 hover:shadow-md hover:border-green-400/30"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge
-                              variant="outline"
-                              className="border-green-400/70 text-green-400 bg-green-400/10 shadow-sm"
-                            >
-                              Individual
-                            </Badge>
-                            <span className="text-sm text-gray-300 font-medium">
-                              {new Date(match.match_date).toLocaleDateString("pt-BR")}
-                            </span>
-                          </div>
-                          <div className="text-sm">
-                            <span className="text-gray-200">Partida: </span>
-                            <span className="text-gray-100 font-medium">{match.title}</span>
-                          </div>
-                        </div>
-                        <Trophy className="h-5 w-5 text-yellow-400 drop-shadow-sm" />
-                      </div>
-                    </div>
-                  )
-                })}
+              {/* Estatísticas */}
+              <div className="flex items-center gap-4">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-green-600">
+                    {player.total_wins}
+                  </div>
+                  <div className="text-xs text-gray-500">Vitórias</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="text-lg font-bold text-red-600">
+                    {player.total_losses}
+                  </div>
+                  <div className="text-xs text-gray-500">Derrotas</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="text-lg font-bold text-blue-600">
+                    {player.total_matches}
+                  </div>
+                  <div className="text-xs text-gray-500">Total</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="text-lg font-bold text-purple-600">
+                    {player.win_rate}%
+                  </div>
+                  <div className="text-xs text-gray-500">Taxa</div>
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          ))}
+        </div>
+
+        {/* Resumo */}
+        <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+          <h4 className="font-semibold text-green-800 mb-2">📊 Resumo do Ranking</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-green-600 font-medium">Total de Jogadores:</span>
+              <span className="ml-2 text-gray-700">{ranking.length}</span>
+            </div>
+            <div>
+              <span className="text-green-600 font-medium">Total de Partidas:</span>
+              <span className="ml-2 text-gray-700">
+                {ranking.reduce((sum, p) => sum + p.total_matches, 0)}
+              </span>
+            </div>
+            <div>
+              <span className="text-green-600 font-medium">Líder:</span>
+              <span className="ml-2 text-gray-700">
+                {ranking[0]?.name || "N/A"}
+              </span>
+            </div>
+            <div>
+              <span className="text-green-600 font-medium">Última Atualização:</span>
+              <span className="ml-2 text-gray-700">
+                {new Date().toLocaleTimeString('pt-BR')}
+              </span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
