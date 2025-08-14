@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getDatabase, isDatabaseAvailable } from '../../../lib/db'
 
+// Forçar renderização dinâmica - desabilitar SSG
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // GET - Buscar ranking dos jogadores
 export async function GET() {
   // Verificar se o banco está disponível
