@@ -177,7 +177,6 @@ export default function SinucaManager() {
 
           <TabsContent value="ranking">
             <RankingTable 
-              players={players}
               onRefresh={loadData}
             />
           </TabsContent>
