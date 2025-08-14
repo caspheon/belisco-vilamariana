@@ -1,17 +1,10 @@
 import { NextResponse } from 'next/server'
-import { neon } from '@neondatabase/serverless'
-
-// Verificar se estamos em produção e se DATABASE_URL está definida
-const isProduction = process.env.NODE_ENV === 'production'
-const hasDatabaseUrl = !!process.env.DATABASE_URL
-
-// Configuração do banco Neon
-const sql = neon(process.env.DATABASE_URL || 'dummy://url')
+import { getDatabase, isDatabaseAvailable } from '../../../lib/db'
 
 // GET - Buscar ranking dos jogadores
 export async function GET() {
-  // Se estamos em produção sem DATABASE_URL, retornar erro
-  if (isProduction && !hasDatabaseUrl) {
+  // Verificar se o banco está disponível
+  if (!isDatabaseAvailable()) {
     return NextResponse.json(
       { error: 'DATABASE_URL não configurada' },
       { status: 500 }
@@ -19,6 +12,7 @@ export async function GET() {
   }
 
   try {
+    const sql = getDatabase()
     const ranking = await sql`
       SELECT 
         p.id,

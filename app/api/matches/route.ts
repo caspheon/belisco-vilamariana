@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { neon } from '@neondatabase/serverless'
-
-// Verificar se estamos em produção e se DATABASE_URL está definida
-const isProduction = process.env.NODE_ENV === 'production'
-const hasDatabaseUrl = !!process.env.DATABASE_URL
-
-// Configuração do banco Neon
-const sql = neon(process.env.DATABASE_URL || 'dummy://url')
+import { getDatabase, isDatabaseAvailable } from '../../../lib/db'
 
 // GET - Listar todas as partidas
 export async function GET() {
-  // Se estamos em produção sem DATABASE_URL, retornar erro
-  if (isProduction && !hasDatabaseUrl) {
+  // Verificar se o banco está disponível
+  if (!isDatabaseAvailable()) {
     return NextResponse.json(
       { error: 'DATABASE_URL não configurada' },
       { status: 500 }
@@ -19,6 +12,7 @@ export async function GET() {
   }
 
   try {
+    const sql = getDatabase()
     const matches = await sql`
       SELECT id, title, match_date, created_at 
       FROM matches 
@@ -37,8 +31,8 @@ export async function GET() {
 
 // POST - Criar nova partida
 export async function POST(request: NextRequest) {
-  // Se estamos em produção sem DATABASE_URL, retornar erro
-  if (isProduction && !hasDatabaseUrl) {
+  // Verificar se o banco está disponível
+  if (!isDatabaseAvailable()) {
     return NextResponse.json(
       { error: 'DATABASE_URL não configurada' },
       { status: 500 }
@@ -54,6 +48,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    
+    const sql = getDatabase()
     
     // Criar a partida
     const [newMatch] = await sql`
