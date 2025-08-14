@@ -25,9 +25,9 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const sql = getDatabase()
       const players = await sql`
-        SELECT id, name, created_at 
+        SELECT id, name, matches, wins, losses, rating, created_at 
         FROM players 
-        ORDER BY name
+        ORDER BY rating DESC, wins DESC, name ASC
       `
       
       return res.status(200).json(players)
@@ -42,9 +42,9 @@ export default async function handler(req, res) {
       
       const sql = getDatabase()
       const [newPlayer] = await sql`
-        INSERT INTO players (name) 
-        VALUES (${name.trim()}) 
-        RETURNING id, name, created_at
+        INSERT INTO players (name, matches, wins, losses, rating) 
+        VALUES (${name.trim()}, 0, 0, 0, 1000) 
+        RETURNING id, name, matches, wins, losses, rating, created_at
       `
       
       return res.status(201).json(newPlayer)

@@ -1,137 +1,153 @@
-const { sql } = require('./db.js');
-import type { 
-  Player, 
-  Match, 
-  MatchResult, 
-  CreatePlayer, 
-  CreateMatch 
-} from './types';
+import { neon } from '@neondatabase/serverless'
 
-// ===== FUNÇÕES DE JOGADORES =====
+// Configuração do banco Neon
+const sql = neon(process.env.DATABASE_URL!)
 
-export async function getAllPlayers(): Promise<Player[]> {
-  return await sql`
-    SELECT 
-      id,
-      name,
-      created_at
-    FROM players
-    ORDER BY name
-  `;
+// Tipos para o banco
+export interface Player {
+  id: number
+  name: string
+  matches: number
+  wins: number
+  losses: number
+  rating: number
+  created_at: string
 }
 
-export async function getPlayerById(id: number): Promise<Player | null> {
-  const result = await sql`
-    SELECT 
-      p.id,
-      p.name,
-      COALESCE(stats.total_matches, 0) as matches,
-      COALESCE(stats.total_wins, 0) as wins,
-      COALESCE(stats.total_losses, 0) as losses
-    FROM players p
-    LEFT JOIN LATERAL get_player_stats(p.id) stats ON true
-    WHERE p.id = ${id}
-  `;
-  
-  if (result.length === 0) return null;
-  
-  const player = result[0];
-  return {
-    ...player,
-    rating: calculateRating(player.wins, player.matches)
-  };
+export interface Match {
+  id: number
+  type: "individual" | "dupla"
+  players: string[]
+  winner: string | string[] // String para individual, array para dupla
+  date: string
 }
+
+export interface CreatePlayer {
+  name: string
+}
+
+export interface CreateMatch {
+  type: "individual" | "dupla"
+  players: string[]
+  winner: string | string[] // String para individual, array para dupla
+}
+
+// Funções do banco de dados
 
 export async function createPlayer(player: CreatePlayer): Promise<Player> {
-  const result = await sql`
-    INSERT INTO players (name)
-    VALUES (${player.name})
-    RETURNING id, name, created_at
-  `;
-  
-  return result[0];
+  try {
+    const result = await sql`
+      INSERT INTO players (name, matches, wins, losses, rating)
+      VALUES (${player.name}, 0, 0, 0, 1000)
+      RETURNING id, name, matches, wins, losses, rating, created_at
+    `
+    
+    if (!result || result.length === 0) {
+      throw new Error('Erro ao criar jogador')
+    }
+    
+    return result[0] as Player
+  } catch (error) {
+    console.error('Erro ao criar jogador:', error)
+    throw new Error('Erro ao criar jogador no banco de dados')
+  }
 }
 
-// ===== FUNÇÕES DE PARTIDAS =====
-
-export async function getAllMatches(): Promise<Match[]> {
-  return await sql`
-    SELECT 
-      m.id,
-      m.title,
-      m.match_date,
-      m.created_at
-    FROM matches m
-    ORDER BY m.match_date DESC, m.created_at DESC
-  `;
+export async function getAllPlayers(): Promise<Player[]> {
+  try {
+    const result = await sql`
+      SELECT id, name, matches, wins, losses, rating, created_at
+      FROM players
+      ORDER BY rating DESC, wins DESC, name ASC
+    `
+    
+    return result as Player[]
+  } catch (error) {
+    console.error('Erro ao buscar jogadores:', error)
+    throw new Error('Erro ao buscar jogadores do banco de dados')
+  }
 }
 
 export async function createMatch(match: CreateMatch): Promise<Match> {
-  // Inserir a partida
-  const matchResult = await sql`
-    INSERT INTO matches (title, match_date)
-    VALUES (${match.title}, CURRENT_DATE)
-    RETURNING id, title, match_date, created_at
-  `;
-  
-  const newMatch = matchResult[0];
-  
-  // Inserir participantes
-  await sql`
-    INSERT INTO match_participants (match_id, player_id)
-    VALUES (${newMatch.id}, ${match.player1Id})
-  `;
-  
-  await sql`
-    INSERT INTO match_participants (match_id, player_id)
-    VALUES (${newMatch.id}, ${match.player2Id})
-  `;
-  
-  // Inserir resultados (player1Id vence = posição 1, player2Id perde = posição 2)
-  await sql`
-    INSERT INTO match_results (match_id, player_id, position)
-    VALUES 
-      (${newMatch.id}, ${match.player1Id}, 1),
-      (${newMatch.id}, ${match.player2Id}, 2)
-  `;
-  
-  return newMatch;
+  try {
+    // Converter winner para array se for string (individual)
+    const winnerArray = Array.isArray(match.winner) ? match.winner : [match.winner]
+    
+    const result = await sql`
+      INSERT INTO matches (type, players, winner)
+      VALUES (${match.type}, ${match.players}, ${winnerArray})
+      RETURNING id, type, players, winner, date
+    `
+    
+    if (!result || result.length === 0) {
+      throw new Error('Erro ao criar partida')
+    }
+    
+    return result[0] as Match
+  } catch (error) {
+    console.error('Erro ao criar partida:', error)
+    throw new Error('Erro ao criar partida no banco de dados')
+  }
 }
 
-// ===== FUNÇÕES DE ESTATÍSTICAS =====
+export async function getAllMatches(): Promise<Match[]> {
+  try {
+    const result = await sql`
+      SELECT id, type, players, winner, date
+      FROM matches
+      ORDER BY date DESC
+    `
+    
+    return result as Match[]
+  } catch (error) {
+    console.error('Erro ao buscar partidas:', error)
+    throw new Error('Erro ao buscar partidas do banco de dados')
+  }
+}
 
 export async function getRanking(): Promise<Player[]> {
-  const players = await sql`
-    SELECT 
-      p.id,
-      p.name,
-      p.created_at,
-      COALESCE(stats.total_matches, 0) as matches,
-      COALESCE(stats.total_wins, 0) as wins,
-      COALESCE(stats.total_losses, 0) as losses
-    FROM players p
-    LEFT JOIN LATERAL get_player_stats(p.id) stats ON true
-    ORDER BY 
-      COALESCE(stats.total_wins, 0) DESC,
-      COALESCE(stats.total_matches, 0) DESC,
-      p.name ASC
-  `;
-  
-  return players.map((player: any) => ({
-    id: player.id,
-    name: player.name,
-    created_at: player.created_at,
-    matches: player.matches || 0,
-    wins: player.wins || 0,
-    losses: player.losses || 0,
-    rating: calculateRating(player.wins || 0, player.matches || 0)
-  }));
+  try {
+    const result = await sql`
+      SELECT id, name, matches, wins, losses, rating, created_at
+      FROM players
+      ORDER BY rating DESC, wins DESC, name ASC
+    `
+    
+    return result as Player[]
+  } catch (error) {
+    console.error('Erro ao buscar ranking:', error)
+    throw new Error('Erro ao buscar ranking do banco de dados')
+  }
 }
 
-// ===== FUNÇÕES AUXILIARES =====
+export async function getPlayerStats(playerId: number): Promise<Player | null> {
+  try {
+    const result = await sql`
+      SELECT id, name, matches, wins, losses, rating, created_at
+      FROM players
+      WHERE id = ${playerId}
+    `
+    
+    if (!result || result.length === 0) {
+      return null
+    }
+    
+    return result[0] as Player
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas do jogador:', error)
+    throw new Error('Erro ao buscar estatísticas do jogador')
+  }
+}
 
-function calculateRating(wins: number, matches: number): number {
-  if (matches === 0) return 1000;
-  const winRate = wins / matches;
-  return Math.round(1000 + (winRate - 0.5) * 400 + wins * 10);
+export async function resetDatabase(): Promise<void> {
+  try {
+    await sql`DROP TABLE IF EXISTS matches CASCADE`
+    await sql`DROP TABLE IF EXISTS players CASCADE`
+    await sql`DROP FUNCTION IF EXISTS update_player_stats CASCADE`
+    
+    console.log('Banco de dados resetado com sucesso!')
+  } catch (error) {
+    console.error('Erro ao resetar banco:', error)
+    throw new Error('Erro ao resetar banco de dados')
+  }
 }

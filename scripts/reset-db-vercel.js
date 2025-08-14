@@ -1,96 +1,142 @@
+require('dotenv').config();
 const { neon } = require('@neondatabase/serverless');
 
-// Verificar se a variável de ambiente está definida
-if (!process.env.DATABASE_URL) {
-  console.error('❌ DATABASE_URL não está definida nas variáveis de ambiente');
-  process.exit(1);
-}
-
-// Configuração do banco Neon
-const sql = neon(process.env.DATABASE_URL);
-
 async function resetDatabase() {
-  console.log('🗑️  Resetando banco de dados Neon...');
+  const sql = neon(process.env.DATABASE_URL);
   
   try {
-    // Desabilitar verificações de foreign key temporariamente
-    await sql`SET session_replication_role = replica`;
+    console.log('🔄 Resetando banco de dados...');
     
-    // Remover todas as tabelas existentes (em ordem para evitar problemas de dependência)
-    console.log('🗑️  Removendo tabelas existentes...');
+    // 1. Remover TODAS as tabelas existentes (incluindo as antigas)
+    console.log('📋 Removendo tabelas existentes...');
     
-    // Remover tabelas na ordem correta (filhas primeiro, depois pais)
-    const tablesToDrop = [
-      'match_results',
-      'match_participants', 
-      'matches',
-      'players'
-    ];
+    // Tabelas antigas que não são mais usadas
+    await sql`DROP TABLE IF EXISTS match_participants CASCADE`;
+    await sql`DROP TABLE IF EXISTS match_results CASCADE`;
+    await sql`DROP TABLE IF EXISTS player_stats CASCADE`;
     
-    for (const table of tablesToDrop) {
-      try {
-        await sql`DROP TABLE IF EXISTS ${sql(table)} CASCADE`;
-        console.log(`✅ Tabela ${table} removida`);
-      } catch (error) {
-        console.log(`⚠️  Erro ao remover tabela ${table}:`, error.message);
-      }
-    }
+    // Tabelas principais
+    await sql`DROP TABLE IF EXISTS matches CASCADE`;
+    await sql`DROP TABLE IF EXISTS players CASCADE`;
     
-    // Remover funções customizadas
-    console.log('🗑️  Removendo funções customizadas...');
-    try {
-      await sql`DROP FUNCTION IF EXISTS get_player_stats(INTEGER) CASCADE`;
-      console.log('✅ Função get_player_stats removida');
-    } catch (error) {
-      console.log('⚠️  Erro ao remover função:', error.message);
-    }
+    // Funções e triggers
+    await sql`DROP FUNCTION IF EXISTS update_player_stats CASCADE`;
+    await sql`DROP FUNCTION IF EXISTS get_player_stats CASCADE`;
     
-    // Remover índices (se ainda existirem)
-    console.log('🗑️  Removendo índices...');
-    const indexesToDrop = [
-      'idx_players_name',
-      'idx_matches_date',
-      'idx_match_participants_match',
-      'idx_match_participants_player',
-      'idx_match_results_match',
-      'idx_match_results_player'
-    ];
+    console.log('✅ Tabelas antigas removidas com sucesso!');
     
-    for (const index of indexesToDrop) {
-      try {
-        await sql`DROP INDEX IF EXISTS ${sql(index)}`;
-        console.log(`✅ Índice ${index} removido`);
-      } catch (error) {
-        // Índices podem não existir, não é erro crítico
-      }
-    }
+    // 2. Criar tabela de jogadores
+    console.log('👥 Criando tabela de jogadores...');
+    await sql`
+      CREATE TABLE players (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        matches INTEGER DEFAULT 0,
+        wins INTEGER DEFAULT 0,
+        losses INTEGER DEFAULT 0,
+        rating INTEGER DEFAULT 1000,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
     
-    // Reabilitar verificações de foreign key
-    await sql`SET session_replication_role = DEFAULT`;
+    // 3. Criar tabela de partidas
+    console.log('🎱 Criando tabela de partidas...');
+    await sql`
+      CREATE TABLE matches (
+        id SERIAL PRIMARY KEY,
+        type VARCHAR(20) NOT NULL CHECK (type IN ('individual', 'dupla')),
+        players TEXT[] NOT NULL,
+        winner TEXT[] NOT NULL,
+        date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
     
-    console.log('✅ Banco de dados resetado com sucesso!');
-    console.log('🔄 Todas as tabelas, dados e estruturas foram removidos.');
+    // 4. Criar função para atualizar estatísticas
+    console.log('⚡ Criando função de atualização de estatísticas...');
+    await sql`
+      CREATE OR REPLACE FUNCTION update_player_stats()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        -- Atualizar estatísticas quando uma partida é criada
+        IF TG_OP = 'INSERT' THEN
+          -- Incrementar matches para todos os jogadores da partida
+          UPDATE players 
+          SET matches = matches + 1
+          WHERE id::text = ANY(NEW.players);
+          
+          -- Incrementar wins para os vencedores
+          UPDATE players 
+          SET wins = wins + 1
+          WHERE name = ANY(NEW.winner);
+          
+          -- Incrementar losses para os perdedores
+          UPDATE players 
+          SET losses = losses + 1
+          WHERE id::text = ANY(NEW.players) AND name != ALL(NEW.winner);
+          
+          -- Atualizar rating para todos os jogadores da partida
+          UPDATE players 
+          SET rating = CASE 
+            WHEN name = ANY(NEW.winner) THEN 
+              GREATEST(1000, rating + 25 + (wins * 2))
+            ELSE 
+              GREATEST(1000, rating - 15 + (wins * 1))
+          END
+          WHERE id::text = ANY(NEW.players);
+          
+          RETURN NEW;
+        END IF;
+        
+        RETURN NULL;
+      END;
+      $$ LANGUAGE plpgsql
+    `;
+    
+    // 5. Criar trigger para executar a função automaticamente
+    console.log('🔗 Criando trigger...');
+    await sql`
+      CREATE TRIGGER update_stats_trigger
+        AFTER INSERT ON matches
+        FOR EACH ROW
+        EXECUTE FUNCTION update_player_stats()
+    `;
+    
+    // 6. Criar índices para performance
+    console.log('📊 Criando índices...');
+    await sql`CREATE INDEX idx_players_rating ON players(rating DESC)`;
+    await sql`CREATE INDEX idx_players_name ON players(name)`;
+    await sql`CREATE INDEX idx_matches_date ON matches(date DESC)`;
+    await sql`CREATE INDEX idx_matches_winner ON matches USING GIN(winner)`;
+    
+    console.log('✅ Banco de dados configurado com sucesso!');
+    console.log('');
+    console.log('🎯 Estrutura limpa criada:');
+    console.log('   - Tabela "players" com campos: id, name, matches, wins, losses, rating, created_at');
+    console.log('   - Tabela "matches" com campos: id, type, players[], winner[], date');
+    console.log('   - Função "update_player_stats()" para atualizar estatísticas automaticamente');
+    console.log('   - Trigger para executar a função após cada inserção de partida');
+    console.log('   - Índices para otimizar consultas');
+    console.log('');
+    console.log('🗑️ Tabelas antigas removidas:');
+    console.log('   - match_participants (não mais necessária)');
+    console.log('   - match_results (não mais necessária)');
+    console.log('   - player_stats (não mais necessária)');
+    console.log('');
+    console.log('🚀 Agora você pode:');
+    console.log('   1. Adicionar jogadores reais');
+    console.log('   2. Criar partidas individuais (1v1) ou em dupla (2v2)');
+    console.log('   3. Selecionar vencedores individuais ou duplas vencedoras');
+    console.log('   4. Ver estatísticas atualizadas automaticamente');
     
   } catch (error) {
-    console.error('❌ Erro ao resetar banco de dados:', error);
-    process.exit(1);
-  }
-}
-
-async function main() {
-  try {
-    await resetDatabase();
-    console.log('🎉 Reset do banco concluído!');
-    process.exit(0);
-  } catch (error) {
-    console.error('💥 Erro inesperado:', error);
+    console.error('❌ Erro ao configurar banco:', error);
     process.exit(1);
   }
 }
 
 // Executar se chamado diretamente
 if (require.main === module) {
-  main();
+  resetDatabase();
 }
 
 module.exports = { resetDatabase };

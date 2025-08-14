@@ -25,50 +25,40 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const sql = getDatabase()
       const matches = await sql`
-        SELECT id, title, match_date, created_at 
+        SELECT id, type, players, winner, date 
         FROM matches 
-        ORDER BY match_date DESC, created_at DESC
+        ORDER BY date DESC
       `
       
       return res.status(200).json(matches)
     }
     
     if (req.method === 'POST') {
-      const { title, player1Id, player2Id } = req.body
+      const { type, players, winner } = req.body
       
-      if (!title || !player1Id || !player2Id) {
-        return res.status(400).json({ error: 'Título e IDs dos jogadores são obrigatórios' })
+      if (!type || !players || !winner) {
+        return res.status(400).json({ error: 'Tipo, jogadores e vencedor são obrigatórios' })
+      }
+      
+      if (!['individual', 'dupla'].includes(type)) {
+        return res.status(400).json({ error: 'Tipo deve ser "individual" ou "dupla"' })
+      }
+      
+      if (!Array.isArray(players) || players.length === 0) {
+        return res.status(400).json({ error: 'Jogadores deve ser um array não vazio' })
+      }
+      
+      if (!Array.isArray(winner) || winner.length === 0) {
+        return res.status(400).json({ error: 'Vencedor deve ser um array não vazio' })
       }
       
       const sql = getDatabase()
       
-      // Criar a partida
+      // Criar a partida com a nova estrutura
       const [newMatch] = await sql`
-        INSERT INTO matches (title, match_date) 
-        VALUES (${title}, CURRENT_DATE) 
-        RETURNING id, title, match_date, created_at
-      `
-      
-      // Adicionar participantes
-      await sql`
-        INSERT INTO match_participants (match_id, player_id) 
-        VALUES (${newMatch.id}, ${player1Id})
-      `
-      
-      await sql`
-        INSERT INTO match_participants (match_id, player_id) 
-        VALUES (${newMatch.id}, ${player2Id})
-      `
-      
-      // Adicionar resultados (player1 vence por padrão)
-      await sql`
-        INSERT INTO match_results (match_id, player_id, position) 
-        VALUES (${newMatch.id}, ${player1Id}, 1)
-      `
-      
-      await sql`
-        INSERT INTO match_results (match_id, player_id, position) 
-        VALUES (${newMatch.id}, ${player2Id}, 2)
+        INSERT INTO matches (type, players, winner) 
+        VALUES (${type}, ${players}, ${winner}) 
+        RETURNING id, type, players, winner, date
       `
       
       return res.status(201).json(newMatch)

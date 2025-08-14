@@ -1,220 +1,259 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
+import { Label } from "./ui/label"
 import { Badge } from "./ui/badge"
-import { Target, Users, Trophy, RefreshCw } from "lucide-react"
-import type { Player, CreateMatch } from "../lib/types"
+import { GamepadIcon, Users, User, Trophy } from "lucide-react"
+import type { Player, Match } from "../../lib/types"
 
 interface MatchCreatorProps {
   players: Player[]
-  onAddMatch: (match: Omit<CreateMatch, "title">) => void
-  onRefresh: () => void
+  onAddMatch: (match: Omit<Match, "id" | "date">) => void
 }
 
-export function MatchCreator({ players, onAddMatch, onRefresh }: MatchCreatorProps) {
-  const [player1Id, setPlayer1Id] = useState<string>("")
-  const [player2Id, setPlayer2Id] = useState<string>("")
-  const [isCreating, setIsCreating] = useState(false)
+export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
+  const [matchType, setMatchType] = useState<"individual" | "dupla">("individual")
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
+  const [selectedWinners, setSelectedWinners] = useState<string[]>([])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!player1Id || !player2Id || player1Id === player2Id || isCreating) return
+  const handlePlayerSelect = (playerId: string, position: number) => {
+    if (!playerId) return // Proteção contra valores vazios
+    
+    const newSelectedPlayers = [...selectedPlayers]
+    newSelectedPlayers[position] = playerId
+    setSelectedPlayers(newSelectedPlayers)
 
-    setIsCreating(true)
-    try {
-      await onAddMatch({
-        player1Id: parseInt(player1Id),
-        player2Id: parseInt(player2Id)
-      })
-      
-      // Reset form
-      setPlayer1Id("")
-      setPlayer2Id("")
-    } finally {
-      setIsCreating(false)
+    // Reset winners if they're no longer in the match
+    if (selectedWinners.length > 0) {
+      const newWinners = selectedWinners.filter(winner => 
+        newSelectedPlayers.some(playerId => {
+          const player = players.find(p => p.id.toString() === playerId)
+          return player && player.name === winner
+        })
+      )
+      setSelectedWinners(newWinners)
     }
   }
 
-  const handleRefresh = () => {
-    onRefresh()
+  const handleWinnerSelect = (winnerName: string, checked: boolean) => {
+    if (checked) {
+      setSelectedWinners(prev => [...prev, winnerName])
+    } else {
+      setSelectedWinners(prev => prev.filter(w => w !== winnerName))
+    }
   }
 
-  const canCreateMatch = player1Id && player2Id && player1Id !== player2Id && !isCreating
+  const handleCreateMatch = () => {
+    const requiredPlayers = matchType === "individual" ? 2 : 4
+    const requiredWinners = matchType === "individual" ? 1 : 2
+    
+    if (selectedPlayers.filter(Boolean).length === requiredPlayers && 
+        selectedWinners.length === requiredWinners) {
+      
+      onAddMatch({
+        type: matchType,
+        players: selectedPlayers.filter(Boolean),
+        winner: selectedWinners, // Sempre enviar como array
+      })
+
+      // Reset form
+      setSelectedPlayers([])
+      setSelectedWinners([])
+    }
+  }
+
+  const requiredPlayers = matchType === "individual" ? 2 : 4
+  const requiredWinners = matchType === "individual" ? 1 : 2
+  const canCreateMatch = selectedPlayers.filter(Boolean).length === requiredPlayers && 
+                        selectedWinners.length === requiredWinners
 
   if (players.length < 2) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5" />
-            Criar Nova Partida
-          </CardTitle>
-        </CardHeader>
+      <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
         <CardContent className="text-center py-8">
-          <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-lg font-medium mb-2">Jogadores insuficientes</p>
-          <p className="text-sm text-gray-500 mb-4">
-            Você precisa de pelo menos 2 jogadores para criar uma partida
-          </p>
-          <p className="text-sm text-gray-400">
-            Atualmente: {players.length} jogador{players.length !== 1 ? 'es' : ''}
-          </p>
+          <GamepadIcon className="h-12 w-12 mx-auto mb-4 opacity-50 text-gray-400" />
+          <p className="text-gray-200">Você precisa de pelo menos 2 jogadores cadastrados para criar uma partida.</p>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5" />
-            Criar Nova Partida
+    <div className="space-y-6">
+      <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-green-400 drop-shadow-sm">
+            <GamepadIcon className="h-5 w-5 text-green-400" />🎱 Nova Partida
           </CardTitle>
-          <Button onClick={handleRefresh} size="sm" variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Atualizar
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Formulário para criar partida */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Jogador 1 */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                🎯 Jogador 1 (Vencedor)
-              </label>
-              <Select value={player1Id} onValueChange={setPlayer1Id}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o primeiro jogador" />
-                </SelectTrigger>
-                <SelectContent>
-                  {players.map((player) => (
-                    <SelectItem key={player.id} value={player.id.toString()}>
-                      {player.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <CardDescription className="text-gray-200">Configure uma nova partida de sinuca</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Match Type Selection */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium text-green-400 drop-shadow-sm">Tipo de Partida</Label>
+            <RadioGroup
+              value={matchType}
+              onValueChange={(value) => {
+                setMatchType(value as "individual" | "dupla")
+                setSelectedPlayers([])
+                setSelectedWinners([])
+              }}
+              className="flex gap-6"
+            >
+              <div className="flex items-center space-x-2 p-3 rounded-lg bg-gray-700/50 hover:bg-gray-700/70 transition-all duration-200">
+                <RadioGroupItem value="individual" id="individual" className="border-green-400 text-green-400" />
+                <Label htmlFor="individual" className="flex items-center gap-2 text-gray-100 cursor-pointer">
+                  <User className="h-4 w-4" />
+                  Individual (1v1)
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2 p-3 rounded-lg bg-gray-700/50 hover:bg-gray-700/70 transition-all duration-200">
+                <RadioGroupItem value="dupla" id="dupla" className="border-green-400 text-green-400" />
+                <Label htmlFor="dupla" className="flex items-center gap-2 text-gray-100 cursor-pointer">
+                  <Users className="h-4 w-4" />
+                  Dupla (2v2)
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
 
-            {/* Jogador 2 */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                🎯 Jogador 2 (Perdedor)
-              </label>
-              <Select value={player2Id} onValueChange={setPlayer2Id}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o segundo jogador" />
-                </SelectTrigger>
-                <SelectContent>
-                  {players.map((player) => (
-                    <SelectItem key={player.id} value={player.id.toString()}>
-                      {player.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* Player Selection */}
+          <div className="space-y-4">
+            <Label className="text-base font-medium text-green-400 drop-shadow-sm">
+              Selecionar Jogadores ({selectedPlayers.filter(Boolean).length}/{requiredPlayers})
+            </Label>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Array.from({ length: requiredPlayers }, (_, index) => (
+                <div key={index} className="space-y-2">
+                  <Label className="text-sm text-gray-100 font-medium">
+                    {matchType === "individual"
+                      ? `Jogador ${index + 1}`
+                      : `${index < 2 ? "Dupla A" : "Dupla B"} - Jogador ${(index % 2) + 1}`}
+                  </Label>
+                  <Select
+                    value={selectedPlayers[index] || ""}
+                    onValueChange={(value) => handlePlayerSelect(value, index)}
+                  >
+                    <SelectTrigger className="bg-gray-700/90 border-gray-500 text-white hover:border-green-400 focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-200 shadow-inner">
+                      <SelectValue placeholder="Selecione um jogador" className="text-gray-300" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-700/95 border-gray-600 shadow-xl backdrop-blur-sm">
+                      {players
+                        .filter(
+                          (player) => !selectedPlayers.includes(player.id.toString()) || selectedPlayers[index] === player.id.toString(),
+                        )
+                        .map((player) => (
+                          <SelectItem
+                            key={player.id}
+                            value={player.id.toString()}
+                            className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span>{player.name}</span>
+                              <Badge
+                                variant="outline"
+                                className="ml-2 border-green-400/70 text-green-400 bg-green-400/10"
+                              >
+                                {player.rating}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Validações */}
-          {player1Id && player2Id && player1Id === player2Id && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-600 text-sm">
-                ❌ Os jogadores devem ser diferentes
-              </p>
+          {/* Winner Selection */}
+          {selectedPlayers.filter(Boolean).length === requiredPlayers && (
+            <div className="space-y-3 p-4 bg-gray-700/30 rounded-lg border border-gray-600/30">
+              <Label className="text-base font-medium flex items-center gap-2 text-green-400 drop-shadow-sm">
+                <Trophy className="h-4 w-4 text-yellow-400" />🏆 {matchType === "individual" ? "Vencedor da Partida" : "Dupla Vencedora"}
+              </Label>
+              
+              {matchType === "individual" ? (
+                // Seleção individual - apenas um vencedor
+                <Select 
+                  value={selectedWinners[0] || ""} 
+                  onValueChange={(value) => setSelectedWinners([value])}
+                >
+                  <SelectTrigger className="bg-gray-700/90 border-gray-500 text-white hover:border-green-400 focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-200 shadow-inner">
+                    <SelectValue placeholder="Selecione o vencedor" className="text-gray-300" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-700/95 border-gray-600 shadow-xl backdrop-blur-sm">
+                    {selectedPlayers.filter(Boolean).map((playerId) => {
+                      const player = players.find((p) => p.id.toString() === playerId)
+                      return player ? (
+                        <SelectItem
+                          key={player.id}
+                          value={player.name}
+                          className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
+                        >
+                          {player.name}
+                        </SelectItem>
+                      ) : null
+                    })}
+                  </SelectContent>
+                </Select>
+              ) : (
+                // Seleção de dupla - múltiplos vencedores
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-300">Selecione os 2 jogadores da dupla vencedora:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {selectedPlayers.filter(Boolean).map((playerId) => {
+                      const player = players.find((p) => p.id.toString() === playerId)
+                      if (!player) return null
+                      
+                      const isSelected = selectedWinners.includes(player.name)
+                      
+                      return (
+                        <div
+                          key={player.id}
+                          className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
+                            isSelected
+                              ? "bg-green-600/20 border-green-400/50 text-green-400"
+                              : "bg-gray-700/50 border-gray-600/50 text-gray-200 hover:bg-gray-600/50 hover:border-green-400/30"
+                          }`}
+                          onClick={() => handleWinnerSelect(player.name, !isSelected)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{player.name}</span>
+                            {isSelected && (
+                              <Badge className="bg-green-600/90 text-white">
+                                Selecionado
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    {selectedWinners.length}/2 jogadores selecionados
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Botão de criação */}
-          <Button 
-            type="submit" 
+          {/* Create Match Button */}
+          <Button
+            onClick={handleCreateMatch}
             disabled={!canCreateMatch}
-            className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50"
+            className="w-full bg-green-600 hover:bg-green-500 shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg py-6"
+            size="lg"
           >
-            {isCreating ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Criando Partida...
-              </>
-            ) : (
-              <>
-                <Trophy className="w-4 h-4 mr-2" />
-                Criar Partida
-              </>
-            )}
+            <Trophy className="h-5 w-5 mr-2" />🎯 Registrar Partida
           </Button>
-        </form>
-
-        {/* Informações da partida */}
-        {canCreateMatch && (
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h4 className="font-semibold text-blue-800 mb-2">📋 Resumo da Partida</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-blue-600 font-medium">Vencedor:</span>
-                <span className="text-gray-700">
-                  {players.find(p => p.id.toString() === player1Id)?.name}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-blue-600 font-medium">Perdedor:</span>
-                <span className="text-gray-700">
-                  {players.find(p => p.id.toString() === player2Id)?.name}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-blue-600 font-medium">Data:</span>
-                <span className="text-gray-700">
-                  {new Date().toLocaleDateString('pt-BR')}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-blue-600 font-medium">Tipo:</span>
-                <Badge variant="secondary" className="bg-green-100 text-green-800">
-                  Individual
-                </Badge>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Estatísticas */}
-        <div className="p-4 bg-gray-50 rounded-lg border">
-          <h4 className="font-semibold text-gray-700 mb-2">📊 Estatísticas</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="text-gray-600 font-medium">Total de Jogadores:</span>
-              <span className="ml-2 text-gray-700">{players.length}</span>
-            </div>
-            <div>
-              <span className="text-gray-600 font-medium">Jogadores Disponíveis:</span>
-              <span className="ml-2 text-gray-700">
-                {players.length >= 2 ? `${players.length} jogadores` : "Insuficientes"}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-600 font-medium">Partidas Possíveis:</span>
-              <span className="ml-2 text-gray-700">
-                {players.length >= 2 ? Math.floor((players.length * (players.length - 1)) / 2) : 0}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-600 font-medium">Última Atualização:</span>
-              <span className="ml-2 text-gray-700">
-                {new Date().toLocaleTimeString('pt-BR')}
-              </span>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

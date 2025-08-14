@@ -57,3 +57,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Estilos personalizados para o tema escuro elegante do Sinuquinha do Belisco */
+@layer components {
+  .sinuca-elegant-card {
+    @apply bg-gray-800/95 border-gray-600/50 shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-gray-800;
+  }
+  
+  .sinuca-green-text {
+    @apply text-green-400 drop-shadow-sm;
+  }
+  
+  .sinuca-slate-bg {
+    @apply bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950;
+  }
+  
+  .sinuca-footer {
+    @apply bg-gray-900/95 border-t border-gray-700/50 backdrop-blur-sm;
+  }
+}

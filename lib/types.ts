@@ -1,45 +1,46 @@
-// Tipos simplificados para Sinu Cado Belisco
+// Tipos para o Sinuquinha do Belisco
+// Estrutura adaptada para o sistema de rating e estatísticas
 
 export interface Player {
-  id: number;
-  name: string;
-  created_at: string;
-  // Campos opcionais para compatibilidade
-  matches?: number;
-  wins?: number;
-  losses?: number;
-  rating?: number;
+  id: number
+  name: string
+  matches: number
+  wins: number
+  losses: number
+  rating: number
+  created_at: string
 }
 
 export interface Match {
-  id: number;
-  title: string;
-  match_date: string;
-  created_at: string;
+  id: number
+  type: "individual" | "dupla"
+  players: string[]
+  winner: string | string[] // String para individual, array para dupla
+  date: string
 }
 
 export interface CreatePlayer {
-  name: string;
+  name: string
 }
 
 export interface CreateMatch {
-  title: string;
-  player1Id: number;
-  player2Id: number;
-}
-
-export interface MatchResult {
-  id: number;
-  match_id: number;
-  player_id: number;
-  position: number;
-  created_at: string;
+  type: "individual" | "dupla"
+  players: string[]
+  winner: string | string[] // String para individual, array para dupla
 }
 
 // Tipos para o ranking
 export interface RankingPlayer extends Player {
-  total_matches: number;
-  total_wins: number;
-  total_losses: number;
-  win_rate: number;
+  winRate: number
+  position: number
+}
+
+// Tipos para estatísticas
+export interface PlayerStats {
+  totalMatches: number
+  totalWins: number
+  totalLosses: number
+  winRate: number
+  currentRating: number
+  bestRating: number
 }

@@ -1,62 +1,79 @@
--- Schema simplificado para Sinu Cado Belisco
--- Banco de dados: Neon PostgreSQL
+-- Schema para o Sinuquinha do Belisco
+-- Estrutura adaptada para o sistema de rating e estatísticas
 
--- Tabela de Jogadores (apenas nome)
-CREATE TABLE IF NOT EXISTS players (
+-- Tabela de jogadores
+CREATE TABLE players (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    matches INTEGER DEFAULT 0,
+    wins INTEGER DEFAULT 0,
+    losses INTEGER DEFAULT 0,
+    rating INTEGER DEFAULT 1000,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabela de Partidas
-CREATE TABLE IF NOT EXISTS matches (
+-- Tabela de partidas
+CREATE TABLE matches (
     id SERIAL PRIMARY KEY,
-    title VARCHAR(200) NOT NULL,
-    match_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    type VARCHAR(20) NOT NULL CHECK (type IN ('individual', 'dupla')),
+    players TEXT[] NOT NULL, -- Array de IDs dos jogadores
+    winner TEXT[] NOT NULL, -- Array de nomes dos vencedores (1 para individual, 2 para dupla)
+    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabela de Participantes das Partidas
-CREATE TABLE IF NOT EXISTS match_participants (
-    id SERIAL PRIMARY KEY,
-    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(match_id, player_id)
-);
-
--- Tabela de Resultados das Partidas
-CREATE TABLE IF NOT EXISTS match_results (
-    id SERIAL PRIMARY KEY,
-    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-    position INTEGER NOT NULL, -- 1º lugar = vencedor, 2º lugar = perdedor
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(match_id, player_id)
-);
-
--- Índices para melhor performance
-CREATE INDEX IF NOT EXISTS idx_players_name ON players(name);
-CREATE INDEX IF NOT EXISTS idx_matches_date ON matches(match_date);
-CREATE INDEX IF NOT EXISTS idx_match_participants_match ON match_participants(match_id);
-CREATE INDEX IF NOT EXISTS idx_match_participants_player ON match_participants(player_id);
-CREATE INDEX IF NOT EXISTS idx_match_results_match ON match_results(match_id);
-CREATE INDEX IF NOT EXISTS idx_match_results_player ON match_results(player_id);
-
--- Função para calcular estatísticas do jogador
-CREATE OR REPLACE FUNCTION get_player_stats(player_id_param INTEGER)
-RETURNS TABLE(
-    total_matches BIGINT,
-    total_wins BIGINT,
-    total_losses BIGINT
-) AS $$
+-- Função para atualizar estatísticas do jogador
+CREATE OR REPLACE FUNCTION update_player_stats()
+RETURNS TRIGGER AS $$
 BEGIN
-    RETURN QUERY
-    SELECT 
-        COUNT(DISTINCT mr.match_id) as total_matches,
-        COUNT(CASE WHEN mr.position = 1 THEN 1 END) as total_wins,
-        COUNT(CASE WHEN mr.position > 1 THEN 1 END) as total_losses
-    FROM match_results mr
-    WHERE mr.player_id = player_id_param;
+    -- Atualizar estatísticas quando uma partida é criada
+    IF TG_OP = 'INSERT' THEN
+        -- Incrementar matches para todos os jogadores da partida
+        UPDATE players 
+        SET matches = matches + 1
+        WHERE id::text = ANY(NEW.players);
+        
+        -- Incrementar wins para os vencedores
+        UPDATE players 
+        SET wins = wins + 1
+        WHERE name = ANY(NEW.winner);
+        
+        -- Incrementar losses para os perdedores
+        UPDATE players 
+        SET losses = losses + 1
+        WHERE id::text = ANY(NEW.players) AND name != ALL(NEW.winner);
+        
+        -- Atualizar rating para todos os jogadores da partida
+        UPDATE players 
+        SET rating = CASE 
+            WHEN name = ANY(NEW.winner) THEN 
+                GREATEST(1000, rating + 25 + (wins * 2))
+            ELSE 
+                GREATEST(1000, rating - 15 + (wins * 1))
+        END
+        WHERE id::text = ANY(NEW.players);
+        
+        RETURN NEW;
+    END IF;
+    
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Trigger para atualizar estatísticas automaticamente
+CREATE TRIGGER update_stats_trigger
+    AFTER INSERT ON matches
+    FOR EACH ROW
+    EXECUTE FUNCTION update_player_stats();
+
+-- Índices para performance
+CREATE INDEX idx_players_rating ON players(rating DESC);
+CREATE INDEX idx_players_name ON players(name);
+CREATE INDEX idx_matches_date ON matches(date DESC);
+CREATE INDEX idx_matches_winner ON matches USING GIN(winner);
+
+-- Inserir alguns jogadores de exemplo (opcional)
+INSERT INTO players (name, matches, wins, losses, rating) VALUES
+    ('João Silva', 0, 0, 0, 1000),
+    ('Maria Santos', 0, 0, 0, 1000),
+    ('Pedro Costa', 0, 0, 0, 1000)
+ON CONFLICT (name) DO NOTHING;
