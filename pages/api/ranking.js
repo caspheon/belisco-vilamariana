@@ -16,12 +16,15 @@ function getDatabase() {
 
 // GET - Buscar ranking dos jogadores
 export default async function handler(req, res) {
-  // Verificar se o banco está disponível
-  if (!process.env.DATABASE_URL) {
-    return res.status(500).json({ error: 'DATABASE_URL não configurada' })
-  }
-
   try {
+    // Verificar se o banco está disponível
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL não configurada')
+      return res.status(500).json({ 
+        error: 'Configuração de banco de dados não encontrada. Verifique se a variável DATABASE_URL está definida.' 
+      })
+    }
+
     if (req.method === 'GET') {
       const sql = getDatabase()
       const ranking = await sql`
@@ -46,7 +49,17 @@ export default async function handler(req, res) {
     
     return res.status(405).json({ error: 'Método não permitido' })
   } catch (error) {
-    console.error('Erro na API:', error)
-    return res.status(500).json({ error: 'Erro interno do servidor' })
+    console.error('Erro na API de ranking:', error)
+    
+    // Tratamento específico para erros de conexão
+    if (error.message && error.message.includes('DATABASE_URL')) {
+      return res.status(500).json({ 
+        error: 'Erro de configuração do banco de dados. Verifique se DATABASE_URL está definida corretamente.' 
+      })
+    }
+    
+    return res.status(500).json({ 
+      error: 'Erro interno do servidor. Verifique a conexão com o banco de dados.' 
+    })
   }
 }

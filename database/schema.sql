@@ -16,7 +16,7 @@ CREATE TABLE players (
 CREATE TABLE matches (
     id SERIAL PRIMARY KEY,
     type VARCHAR(20) NOT NULL CHECK (type IN ('individual', 'dupla')),
-    players TEXT[] NOT NULL, -- Array de IDs dos jogadores
+    players TEXT[] NOT NULL, -- Array de nomes dos jogadores
     winner TEXT[] NOT NULL, -- Array de nomes dos vencedores (1 para individual, 2 para dupla)
     date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -30,7 +30,7 @@ BEGIN
         -- Incrementar matches para todos os jogadores da partida
         UPDATE players 
         SET matches = matches + 1
-        WHERE id::text = ANY(NEW.players);
+        WHERE name = ANY(NEW.players);
         
         -- Incrementar wins para os vencedores
         UPDATE players 
@@ -40,7 +40,7 @@ BEGIN
         -- Incrementar losses para os perdedores
         UPDATE players 
         SET losses = losses + 1
-        WHERE id::text = ANY(NEW.players) AND name != ALL(NEW.winner);
+        WHERE name = ANY(NEW.players) AND name != ALL(NEW.winner);
         
         -- Atualizar rating para todos os jogadores da partida
         UPDATE players 
@@ -50,7 +50,7 @@ BEGIN
             ELSE 
                 GREATEST(1000, rating - 15 + (wins * 1))
         END
-        WHERE id::text = ANY(NEW.players);
+        WHERE name = ANY(NEW.players);
         
         RETURN NEW;
     END IF;

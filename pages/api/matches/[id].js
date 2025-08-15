@@ -14,7 +14,7 @@ function getDatabase() {
   return sql
 }
 
-// GET - Listar todos os jogadores
+// DELETE - Apagar partida específica
 export default async function handler(req, res) {
   try {
     // Verificar se o banco está disponível
@@ -25,56 +25,42 @@ export default async function handler(req, res) {
       })
     }
 
-    if (req.method === 'GET') {
+    if (req.method === 'DELETE') {
+      const { id } = req.query
+      
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({ error: 'ID da partida é obrigatório e deve ser um número' })
+      }
+
       const sql = getDatabase()
-      const players = await sql`
-        SELECT id, name, matches, wins, losses, rating, created_at 
-        FROM players 
-        ORDER BY rating DESC, wins DESC, name ASC
+      
+      // Verificar se a partida existe
+      const [existingMatch] = await sql`
+        SELECT id, type, players, winner FROM matches WHERE id = ${parseInt(id)}
       `
       
-      return res.status(200).json(players)
-    }
-    
-    if (req.method === 'POST') {
-      const { name } = req.body
-      
-      if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        return res.status(400).json({ error: 'Nome é obrigatório' })
+      if (!existingMatch) {
+        return res.status(404).json({ error: 'Partida não encontrada' })
       }
       
-      const sql = getDatabase()
-      const [newPlayer] = await sql`
-        INSERT INTO players (name, matches, wins, losses, rating) 
-        VALUES (${name.trim()}, 0, 0, 0, 1000) 
-        RETURNING id, name, matches, wins, losses, rating, created_at
-      `
+      // Apagar a partida específica
+      await sql`DELETE FROM matches WHERE id = ${parseInt(id)}`
       
-      return res.status(201).json(newPlayer)
-    }
-    
-    if (req.method === 'DELETE') {
-      const sql = getDatabase()
-      
-      // Apagar todos os jogadores
-      await sql`DELETE FROM players`
-      
-      return res.status(200).json({ message: 'Todos os jogadores foram apagados com sucesso' })
+      return res.status(200).json({ 
+        message: `Partida ${existingMatch.type} foi apagada com sucesso`,
+        deletedMatch: existingMatch
+      })
     }
     
     return res.status(405).json({ error: 'Método não permitido' })
   } catch (error) {
-    console.error('Erro na API de jogadores:', error)
+    console.error('Erro na API de exclusão de partida:', error)
     
     // Tratamento específico para erros de conexão
     if (error.message && error.message.includes('DATABASE_URL')) {
       return res.status(500).json({ 
         error: 'Erro de configuração do banco de dados. Verifique se DATABASE_URL está definida corretamente.' 
       })
-    }
-    
-    if (error.code === '23505') { // Unique constraint violation
-      return res.status(400).json({ error: 'Jogador com este nome já existe' })
     }
     
     return res.status(500).json({ 

@@ -1,197 +1,114 @@
-require('dotenv').config()
-const { neon } = require('@neondatabase/serverless')
+import { neon } from '@neondatabase/serverless'
+import dotenv from 'dotenv'
 
-async function seedRealData() {
-  const sql = neon(process.env.DATABASE_URL)
-  
+// Carregar variáveis de ambiente
+dotenv.config()
+
+// Configuração do banco Neon
+let sql = null
+
+function getDatabase() {
+  if (!sql) {
+    const databaseUrl = process.env.DATABASE_URL
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL não está definida')
+    }
+    sql = neon(databaseUrl)
+  }
+  return sql
+}
+
+// Dados dos jogadores
+const players = [
+  { name: 'Guerra', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Pedro Meneguetti', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Wagnao', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Zenatti', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Mexicano', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Caccuri', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Seu Porra', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Predinho', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Random', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Dpetris', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Gui', rating: 1000, matches: 0, wins: 0, losses: 0 },
+  { name: 'Turazza', rating: 1000, matches: 0, wins: 0, losses: 0 }
+]
+
+// Dados das partidas individuais
+const individualMatches = [
+  { players: ['Guerra', 'Pedro Meneguetti'], winner: ['Guerra'], score: [5, 1] },
+  { players: ['Guerra', 'Wagnao'], winner: ['Guerra'], score: [3, 0] },
+  { players: ['Pedro Meneguetti', 'Wagnao'], winner: ['Pedro Meneguetti', 'Wagnao'], score: [1, 1] },
+  { players: ['Zenatti', 'Pedro Meneguetti'], winner: ['Zenatti'], score: [2, 1] },
+  { players: ['Pedro Meneguetti', 'Mexicano'], winner: ['Pedro Meneguetti'], score: [1, 0] }
+]
+
+// Dados das partidas em dupla
+const duplaMatches = [
+  { players: ['Pedro Meneguetti', 'Zenatti', 'Mexicano', 'Wagnao'], winner: ['Pedro Meneguetti', 'Zenatti'], score: [1, 0] },
+  { players: ['Pedro Meneguetti', 'Wagnao', 'Mexicano', 'Zenatti'], winner: ['Mexicano', 'Zenatti'], score: [0, 2] },
+  { players: ['Pedro Meneguetti', 'Zenatti', 'Mexicano', 'Guerra'], winner: ['Pedro Meneguetti', 'Zenatti'], score: [2, 0] },
+  { players: ['Guerra', 'Wagnao', 'Pedro Meneguetti', 'Zenatti'], winner: ['Guerra', 'Wagnao'], score: [1, 0] },
+  { players: ['Guerra', 'Wagnao', 'Caccuri', 'Mexicano'], winner: ['Guerra', 'Wagnao'], score: [1, 0] },
+  { players: ['Pedro Meneguetti', 'Seu Porra', 'Guerra', 'Wagnao'], winner: ['Pedro Meneguetti', 'Seu Porra'], score: [1, 0] },
+  { players: ['Guerra', 'Pedro Meneguetti', 'Caccuri', 'Seu Porra'], winner: ['Guerra', 'Pedro Meneguetti'], score: [1, 0] },
+  { players: ['Guerra', 'Wagnao', 'Pedro Meneguetti', 'Predinho'], winner: ['Guerra', 'Wagnao'], score: [1, 0] },
+  { players: ['Guerra', 'Pedro Meneguetti', 'Wagnao', 'Random'], winner: ['Guerra', 'Pedro Meneguetti'], score: [2, 1] },
+  { players: ['Dpetris', 'Pedro Meneguetti', 'Zenatti', 'Mexicano'], winner: ['Dpetris', 'Pedro Meneguetti', 'Zenatti', 'Mexicano'], score: [1, 1] },
+  { players: ['Guerra', 'Pedro Meneguetti', 'Mexicano', 'Zenatti'], winner: ['Guerra', 'Pedro Meneguetti'], score: [1, 0] },
+  { players: ['Guerra', 'Pedro Meneguetti', 'Dpetris', 'Random'], winner: ['Guerra', 'Pedro Meneguetti'], score: [1, 0] },
+  { players: ['Guerra', 'Seu Porra', 'Dpetris', 'Gui'], winner: ['Guerra', 'Seu Porra'], score: [1, 0] },
+  { players: ['Dpetris', 'Guerra', 'Turazza', 'Gui'], winner: ['Turazza', 'Gui'], score: [0, 1] },
+  { players: ['Pedro Meneguetti', 'Guerra', 'Zenatti', 'Random'], winner: ['Pedro Meneguetti', 'Guerra'], score: [1, 0] }
+]
+
+async function seedDatabase() {
   try {
-    console.log('🌱 Iniciando seed dos dados reais...')
+    console.log('🌱 Iniciando seed do banco de dados...')
     
-    // 1. Adicionar todos os jogadores
-    console.log('👥 Adicionando jogadores...')
-    const players = [
-      'Pedro Meneguetti',
-      'Zenatti',
-      'Mexicano',
-      'Wagner',
-      'Guerra',
-      'Caccuri',
-      '"Seu Porra"',
-      'Depetris',
-      'Lucas',
-      'Gui Scoleso',
-      'Turazza',
-      'Predinho',
-      'Yuri'
-    ]
+    const sql = getDatabase()
     
-    for (const playerName of players) {
-      try {
-        await sql`
-          INSERT INTO players (name, matches, wins, losses, rating, created_at)
-          VALUES (${playerName}, 0, 0, 0, 1000, CURRENT_TIMESTAMP)
-          ON CONFLICT (name) DO NOTHING
-        `
-        console.log(`✅ Jogador ${playerName} adicionado/verificado`)
-      } catch (error) {
-        console.log(`⚠️ Jogador ${playerName}: ${error.message}`)
-      }
+    // Limpar dados existentes
+    console.log('🧹 Limpando dados existentes...')
+    await sql`DELETE FROM matches`
+    await sql`DELETE FROM players`
+    
+    // Inserir jogadores
+    console.log('👥 Inserindo jogadores...')
+    for (const player of players) {
+      const [newPlayer] = await sql`
+        INSERT INTO players (name, matches, wins, losses, rating) 
+        VALUES (${player.name}, ${player.matches}, ${player.wins}, ${player.losses}, ${player.rating}) 
+        RETURNING id, name
+      `
+      console.log(`✅ Jogador inserido: ${newPlayer.name} (ID: ${newPlayer.id})`)
     }
     
-    // 2. Adicionar partidas em dupla
-    console.log('\n🎱 Adicionando partidas em dupla...')
-    const duplaMatches = [
-      {
-        players: ['Pedro Meneguetti', 'Zenatti'],
-        winner: ['Pedro Meneguetti', 'Zenatti'],
-        opponent: ['Mexicano', 'Wagner']
-      },
-      {
-        players: ['Pedro Meneguetti', 'Wagner'],
-        winner: ['Mexicano', 'Zenatti'],
-        opponent: ['Mexicano', 'Zenatti']
-      },
-      {
-        players: ['Pedro Meneguetti', 'Zenatti'],
-        winner: ['Pedro Meneguetti', 'Zenatti'],
-        opponent: ['Mexicano', 'Guerra']
-      },
-      {
-        players: ['Guerra', 'Wagner'],
-        winner: ['Guerra', 'Wagner'],
-        opponent: ['Pedro Meneguetti', 'Zenatti']
-      },
-      {
-        players: ['Guerra', 'Wagner'],
-        winner: ['Guerra', 'Wagner'],
-        opponent: ['Caccuri', 'Mexicano']
-      },
-      {
-        players: ['Pedro Meneguetti', '"Seu Porra"'],
-        winner: ['Pedro Meneguetti', '"Seu Porra"'],
-        opponent: ['Guerra', 'Wagner']
-      },
-      {
-        players: ['Guerra', 'Pedro Meneguetti'],
-        winner: ['Guerra', 'Pedro Meneguetti'],
-        opponent: ['Caccuri', '"Seu Porra"']
-      },
-      {
-        players: ['Guerra', 'Wagner'],
-        winner: ['Guerra', 'Wagner'],
-        opponent: ['Pedro Meneguetti', 'Predinho']
-      },
-      {
-        players: ['Guerra', 'Pedro Meneguetti'],
-        winner: ['Guerra', 'Pedro Meneguetti'],
-        opponent: ['Wagner', 'Yuri']
-      },
-      {
-        players: ['Depetris', 'Pedro Meneguetti'],
-        winner: ['Depetris', 'Pedro Meneguetti'], // Empate - ambos ganham
-        opponent: ['Zenatti', 'Mexicano']
-      },
-      {
-        players: ['Guerra', 'Pedro Meneguetti'],
-        winner: ['Guerra', 'Pedro Meneguetti'],
-        opponent: ['Mexicano', 'Zenatti']
-      },
-      {
-        players: ['Guerra', 'Pedro Meneguetti'],
-        winner: ['Guerra', 'Pedro Meneguetti'],
-        opponent: ['Depetris', 'Lucas']
-      },
-      {
-        players: ['Guerra', '"Seu Porra"'],
-        winner: ['Guerra', '"Seu Porra"'],
-        opponent: ['Depetris', 'Gui Scoleso']
-      },
-      {
-        players: ['Depetris', 'Guerra'],
-        winner: ['Turazza', 'Gui Scoleso'],
-        opponent: ['Turazza', 'Gui Scoleso']
-      }
-    ]
-    
-    for (const match of duplaMatches) {
-      try {
-        // Buscar IDs dos jogadores
-        const playerIds = await sql`
-          SELECT id FROM players WHERE name = ANY(${match.players})
-        `
-        const opponentIds = await sql`
-          SELECT id FROM players WHERE name = ANY(${match.opponent})
-        `
-        
-        if (playerIds.length === 2 && opponentIds.length === 2) {
-          const allPlayers = [...playerIds, ...opponentIds].map(p => p.id.toString())
-          
-          await sql`
-            INSERT INTO matches (type, players, winner, date)
-            VALUES ('dupla', ${allPlayers}, ${match.winner}, CURRENT_TIMESTAMP)
-          `
-          console.log(`✅ Partida dupla: ${match.winner.join(' & ')} vs ${match.opponent.join(' & ')}`)
-        }
-      } catch (error) {
-        console.log(`⚠️ Erro na partida dupla: ${error.message}`)
-      }
-    }
-    
-    // 3. Adicionar partidas individuais
-    console.log('\n🥇 Adicionando partidas individuais...')
-    const individualMatches = [
-      {
-        players: ['Guerra', 'Pedro Meneguetti'],
-        winner: ['Guerra']
-      },
-      {
-        players: ['Guerra', 'Wagner'],
-        winner: ['Guerra']
-      },
-      {
-        players: ['Pedro Meneguetti', 'Wagner'],
-        winner: ['Pedro Meneguetti', 'Wagner'] // Empate - ambos ganham
-      }
-    ]
-    
+    // Inserir partidas individuais
+    console.log('🎱 Inserindo partidas individuais...')
     for (const match of individualMatches) {
-      try {
-        // Buscar IDs dos jogadores
-        const playerIds = await sql`
-          SELECT id FROM players WHERE name = ANY(${match.players})
-        `
-        
-        if (playerIds.length === 2) {
-          const allPlayers = playerIds.map(p => p.id.toString())
-          
-          await sql`
-            INSERT INTO matches (type, players, winner, date)
-            VALUES ('individual', ${allPlayers}, ${match.winner}, CURRENT_TIMESTAMP)
-          `
-          console.log(`✅ Partida individual: ${match.winner.join(' & ')} vs ${match.players.filter(p => !match.winner.includes(p)).join(' & ')}`)
-        }
-      } catch (error) {
-        console.log(`⚠️ Erro na partida individual: ${error.message}`)
-      }
+      const [newMatch] = await sql`
+        INSERT INTO matches (type, players, winner) 
+        VALUES ('individual', ${match.players}, ${match.winner}) 
+        RETURNING id, type, players, winner
+      `
+      console.log(`✅ Partida individual inserida: ${match.players.join(' vs ')} (ID: ${newMatch.id})`)
     }
     
-    console.log('\n🎉 Seed dos dados reais concluído com sucesso!')
-    console.log('📊 Verificando estatísticas finais...')
+    // Inserir partidas em dupla
+    console.log('👥 Inserindo partidas em dupla...')
+    for (const match of duplaMatches) {
+      const [newMatch] = await sql`
+        INSERT INTO matches (type, players, winner) 
+        VALUES ('dupla', ${match.players}, ${match.winner}) 
+        RETURNING id, type, players, winner
+      `
+      console.log(`✅ Partida em dupla inserida: ${match.players.slice(0, 2).join(' e ')} vs ${match.players.slice(2).join(' e ')} (ID: ${newMatch.id})`)
+    }
     
-    // 4. Verificar estatísticas finais
-    const finalStats = await sql`
-      SELECT name, matches, wins, losses, rating
-      FROM players
-      ORDER BY rating DESC, wins DESC
-    `
-    
-    console.log('\n🏆 Ranking final dos jogadores:')
-    finalStats.forEach((player, index) => {
-      console.log(`${index + 1}. ${player.name}: ${player.matches} partidas, ${player.wins}V/${player.losses}D, Rating: ${player.rating}`)
-    })
-    
-    const totalMatches = await sql`SELECT COUNT(*) as count FROM matches`
-    console.log(`\n📈 Total de partidas registradas: ${totalMatches[0].count}`)
+    console.log('🎉 Seed concluído com sucesso!')
+    console.log(`📊 Total de jogadores inseridos: ${players.length}`)
+    console.log(`🎱 Total de partidas inseridas: ${individualMatches.length + duplaMatches.length}`)
     
   } catch (error) {
     console.error('❌ Erro durante o seed:', error)
@@ -199,4 +116,5 @@ async function seedRealData() {
   }
 }
 
-seedRealData()
+// Executar o seed
+seedDatabase()

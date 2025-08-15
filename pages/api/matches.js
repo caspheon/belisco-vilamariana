@@ -16,12 +16,15 @@ function getDatabase() {
 
 // GET - Listar todas as partidas
 export default async function handler(req, res) {
-  // Verificar se o banco está disponível
-  if (!process.env.DATABASE_URL) {
-    return res.status(500).json({ error: 'DATABASE_URL não configurada' })
-  }
-
   try {
+    // Verificar se o banco está disponível
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL não configurada')
+      return res.status(500).json({ 
+        error: 'Configuração de banco de dados não encontrada. Verifique se a variável DATABASE_URL está definida.' 
+      })
+    }
+
     if (req.method === 'GET') {
       const sql = getDatabase()
       const matches = await sql`
@@ -61,12 +64,31 @@ export default async function handler(req, res) {
         RETURNING id, type, players, winner, date
       `
       
-      return res.status(201).json(newMatch)
+      return res.status(200).json(newMatch)
+    }
+    
+    if (req.method === 'DELETE') {
+      const sql = getDatabase()
+      
+      // Apagar todas as partidas
+      await sql`DELETE FROM matches`
+      
+      return res.status(200).json({ message: 'Todas as partidas foram apagadas com sucesso' })
     }
     
     return res.status(405).json({ error: 'Método não permitido' })
   } catch (error) {
-    console.error('Erro na API:', error)
-    return res.status(500).json({ error: 'Erro interno do servidor' })
+    console.error('Erro na API de partidas:', error)
+    
+    // Tratamento específico para erros de conexão
+    if (error.message && error.message.includes('DATABASE_URL')) {
+      return res.status(500).json({ 
+        error: 'Erro de configuração do banco de dados. Verifique se DATABASE_URL está definida corretamente.' 
+      })
+    }
+    
+    return res.status(500).json({ 
+      error: 'Erro interno do servidor. Verifique a conexão com o banco de dados.' 
+    })
   }
 }

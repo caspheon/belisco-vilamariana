@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
-import { Trophy, Medal, Award, TrendingUp } from "lucide-react"
+import { Trophy, Medal, Award, TrendingUp, Users, User } from "lucide-react"
 import type { Player, Match } from "../lib/types"
 
 interface RankingTableProps {
@@ -11,12 +11,35 @@ interface RankingTableProps {
 }
 
 export function RankingTable({ players, matches }: RankingTableProps) {
+  // Função para calcular vitórias por tipo de partida
+  const calculateVictoriesByType = (playerName: string) => {
+    let individualWins = 0
+    let duplaWins = 0
+
+    matches.forEach(match => {
+      if (!match.players || !match.winner) return
+
+      const winners = Array.isArray(match.winner) ? match.winner : [match.winner]
+      const isPlayerWinner = winners.includes(playerName)
+      
+      if (isPlayerWinner) {
+        if (match.type === 'individual') {
+          individualWins++
+        } else if (match.type === 'dupla') {
+          duplaWins++
+        }
+      }
+    })
+
+    return { individualWins, duplaWins }
+  }
+
   const sortedPlayers = [...players].sort((a, b) => {
     // Sort by rating first, then by win rate, then by total wins
     if (b.rating !== a.rating) return b.rating - a.rating
 
     const aWinRate = a.matches > 0 ? a.wins / a.matches : 0
-    const bWinRate = b.matches > 0 ? b.wins / b.matches : 0
+    const bWinRate = b.matches > 0 ? b.wins / a.matches : 0
 
     if (bWinRate !== aWinRate) return bWinRate - aWinRate
 
@@ -74,6 +97,7 @@ export function RankingTable({ players, matches }: RankingTableProps) {
             {sortedPlayers.map((player, index) => {
               const position = index + 1
               const winRate = player.matches > 0 ? (player.wins / player.matches) * 100 : 0
+              const { individualWins, duplaWins } = calculateVictoriesByType(player.name)
 
               return (
                 <div
@@ -98,6 +122,17 @@ export function RankingTable({ players, matches }: RankingTableProps) {
                           <span className="text-green-400 font-medium">{player.wins}V</span>
                           <span className="text-gray-400">•</span>
                           <span className="text-red-400 font-medium">{player.losses}D</span>
+                        </div>
+                        {/* Nova linha com vitórias por tipo */}
+                        <div className="flex items-center gap-3 mt-1 text-xs">
+                          <div className="flex items-center gap-1 text-blue-400">
+                            <User className="h-3 w-3" />
+                            <span>{individualWins} individual</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-purple-400">
+                            <Users className="h-3 w-3" />
+                            <span>{duplaWins} dupla</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -139,7 +174,8 @@ export function RankingTable({ players, matches }: RankingTableProps) {
           <CardContent>
             <div className="space-y-3">
               {matches
-                .slice(-5)
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Ordenar por data mais recente primeiro
+                .slice(0, 5) // Limitar para apenas as 5 partidas mais recentes
                 .map((match) => {
                   // Verificação de segurança para match.players
                   if (!match.players || !Array.isArray(match.players)) {
@@ -153,13 +189,23 @@ export function RankingTable({ players, matches }: RankingTableProps) {
 
                   // Converter winner para array se for string
                   const winners = Array.isArray(match.winner) ? match.winner : [match.winner]
-                  const winnerPlayers = winners.map(winnerName => 
-                    players.find(p => p.name === winnerName)
-                  ).filter(Boolean)
                   
-                  const matchPlayers = match.players
-                    .map((id) => players.find((p) => p.id.toString() === id))
-                    .filter(Boolean)
+                  // Formatar data e hora - ajustar fuso horário (-3 horas para Brasília)
+                  const matchDate = new Date(match.date)
+                  
+                  // Ajustar para fuso horário brasileiro (UTC-3, subtrair 3 horas)
+                  const adjustedDate = new Date(matchDate.getTime() - (3 * 60 * 60 * 1000))
+                  
+                  const formattedDate = adjustedDate.toLocaleDateString("pt-BR", {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                  })
+                  
+                  const formattedTime = adjustedDate.toLocaleTimeString("pt-BR", {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })
 
                   return (
                     <div
@@ -175,24 +221,27 @@ export function RankingTable({ players, matches }: RankingTableProps) {
                             >
                               {match.type === "individual" ? "Individual" : "Dupla"}
                             </Badge>
-                            <span className="text-sm text-gray-300 font-medium">
-                              {new Date(match.date).toLocaleDateString("pt-BR")}
-                            </span>
+                            <div className="flex flex-col text-xs">
+                              <span className="text-gray-300 font-medium">
+                                📅 {formattedDate}
+                              </span>
+                              <span className="text-gray-400">
+                                🕐 {formattedTime}
+                              </span>
+                            </div>
                           </div>
                           <div className="text-sm">
                             <span className="font-semibold text-green-400 drop-shadow-sm">
                               {match.type === "individual" 
-                                ? winnerPlayers[0]?.name 
-                                : `${winnerPlayers[0]?.name} e ${winnerPlayers[1]?.name}`
+                                ? winners[0] 
+                                : `${winners[0]} e ${winners[1]}`
                               }
                             </span>
                             <span className="text-gray-200"> {match.type === "individual" ? "venceu" : "venceram"} contra </span>
                             <span className="text-gray-100 font-medium">
                               {(() => {
-                                const losers = matchPlayers
-                                  .filter((p) => !winners.includes(p?.name || ""))
-                                  .map((p) => p?.name)
-                                  .filter(Boolean)
+                                const losers = match.players
+                                  .filter((playerName) => !winners.includes(playerName))
                                 
                                 if (losers.length === 0) return ""
                                 if (losers.length === 1) return losers[0]
@@ -202,7 +251,12 @@ export function RankingTable({ players, matches }: RankingTableProps) {
                             </span>
                           </div>
                         </div>
-                        <Trophy className="h-5 w-5 text-yellow-400 drop-shadow-sm" />
+                        <div className="text-right">
+                          <Trophy className="h-5 w-5 text-yellow-400 drop-shadow-sm mb-2" />
+                          <div className="text-xs text-gray-400 text-center">
+                            Partida #{match.id}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )

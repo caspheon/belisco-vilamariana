@@ -7,6 +7,7 @@ import { Users, Trophy, Target, ExternalLink } from "lucide-react"
 import { PlayerManager } from "../components/player-manager"
 import { MatchCreator } from "../components/match-creator"
 import { RankingTable } from "../components/ranking-table"
+import { HamburgerMenu } from "../components/hamburger-menu"
 import type { Player, Match, CreatePlayer, CreateMatch } from "../lib/types"
 
 export default function SinucaManager() {
@@ -14,6 +15,8 @@ export default function SinucaManager() {
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [adminUsername, setAdminUsername] = useState("")
 
   // Carregar dados iniciais
   const loadData = async () => {
@@ -101,6 +104,66 @@ export default function SinucaManager() {
     }
   }
 
+  // Funções administrativas
+  const handleLogin = (username: string, password: string) => {
+    if (username === "admin" && password === "admin") {
+      setIsLoggedIn(true)
+      setAdminUsername(username)
+      setError(null)
+    }
+  }
+
+  const handleLogout = () => {
+    setIsLoggedIn(false)
+    setAdminUsername("")
+  }
+
+  const handleDeletePlayer = async (playerId: number) => {
+    if (!isLoggedIn) return
+    
+    try {
+      setError(null)
+      
+      // Apagar jogador via API
+      const response = await fetch(`/api/players/${playerId}`, {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) {
+        throw new Error('Erro ao apagar jogador')
+      }
+      
+      setPlayers(prev => prev.filter(p => p.id !== playerId))
+      setError(null)
+    } catch (err: any) {
+      console.error('Erro ao apagar jogador:', err)
+      setError('Erro ao apagar jogador')
+    }
+  }
+
+  const handleDeleteMatch = async (matchId: number) => {
+    if (!isLoggedIn) return
+    
+    try {
+      setError(null)
+      
+      // Apagar partida via API
+      const response = await fetch(`/api/matches/${matchId}`, {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) {
+        throw new Error('Erro ao apagar partida')
+      }
+      
+      setMatches(prev => prev.filter(m => m.id !== matchId))
+      setError(null)
+    } catch (err: any) {
+      console.error('Erro ao apagar partida:', err)
+      setError('Erro ao apagar partida')
+    }
+  }
+
   // Carregar dados na inicialização
   useEffect(() => {
     loadData()
@@ -122,92 +185,114 @@ export default function SinucaManager() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950 flex flex-col">
-      <div className="container mx-auto px-4 py-8 flex-1">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-green-400 mb-2 flex items-center justify-center gap-3 drop-shadow-lg">
-            🎱 Sinuquinha do Belisco 🎱
-          </h1>
-          <p className="text-green-300/90 text-lg md:text-xl">Organize partidas e acompanhe o ranking dos jogadores</p>
-        </div>
+      {/* Menu Hambúrguer */}
+      <HamburgerMenu
+        isLoggedIn={isLoggedIn}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
+        onDeletePlayer={handleDeletePlayer}
+        onDeleteMatch={handleDeleteMatch}
+        players={players}
+        matches={matches}
+      />
 
-        {/* Error Display */}
-        {error && (
-          <div className="bg-red-600/90 text-white p-4 rounded-lg mb-6 text-center border border-red-500/50 shadow-xl">
-            ❌ {error}
-          </div>
-        )}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-gray-800">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-100">Total de Jogadores</CardTitle>
-              <Users className="h-4 w-4 text-green-400 drop-shadow-sm" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-400 drop-shadow-sm">{totalPlayers}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-gray-800">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-100">Partidas Jogadas</CardTitle>
-              <Target className="h-4 w-4 text-green-400 drop-shadow-sm" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-400 drop-shadow-sm">{totalMatches}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-gray-800">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-100">Líder Atual</CardTitle>
-              <Trophy className="h-4 w-4 text-yellow-400 drop-shadow-sm" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-400 drop-shadow-sm">
-                {players.length > 0 ? players.sort((a, b) => b.rating - a.rating)[0]?.name || "N/A" : "N/A"}
+      {/* Conteúdo principal com espaçamento para o header */}
+      <div className="pt-16 flex-1">
+        <div className="container mx-auto px-4 py-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-green-400 mb-2 flex items-center justify-center gap-3 drop-shadow-lg">
+              🎱 Sinuquinha do Belisco 🎱
+            </h1>
+            <p className="text-green-300/90 text-base md:text-lg lg:text-xl">Organize partidas e acompanhe o ranking dos jogadores</p>
+            
+            {/* Indicador de status de login */}
+            {isLoggedIn && (
+              <div className="mt-4 inline-flex items-center gap-2 bg-green-600/20 text-green-400 px-4 py-2 rounded-full border border-green-500/30">
+                <Users className="h-4 w-4" />
+                <span className="text-sm font-medium">Admin Logado: {adminUsername}</span>
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-600/90 text-white p-4 rounded-lg mb-6 text-center border border-red-500/50 shadow-xl">
+              ❌ {error}
+            </div>
+          )}
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-gray-800">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-100">Total de Jogadores</CardTitle>
+                <Users className="h-4 w-4 text-green-400 drop-shadow-sm" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-400 drop-shadow-sm">{totalPlayers}</div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-gray-800">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-100">Partidas Jogadas</CardTitle>
+                <Target className="h-4 w-4 text-green-400 drop-shadow-sm" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-400 drop-shadow-sm">{totalMatches}</div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-gray-800">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-100">Líder Atual</CardTitle>
+                <Trophy className="h-4 w-4 text-yellow-400 drop-shadow-sm" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-400 drop-shadow-sm">
+                  {players.length > 0 ? players.sort((a, b) => b.rating - a.rating)[0]?.name || "N/A" : "N/A"}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content */}
+          <Tabs defaultValue="players" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3 bg-gray-800/95 border-gray-600/50 shadow-lg">
+              <TabsTrigger
+                value="players"
+                className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 text-gray-200 hover:text-white hover:bg-gray-700 text-sm sm:text-base"
+              >
+                🎯 Jogadores
+              </TabsTrigger>
+              <TabsTrigger
+                value="matches"
+                className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 text-gray-200 hover:text-white hover:bg-gray-700 text-sm sm:text-base"
+              >
+                🎱 Nova Partida
+              </TabsTrigger>
+              <TabsTrigger
+                value="ranking"
+                className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 text-gray-200 hover:text-white hover:bg-gray-700 text-sm sm:text-base"
+              >
+                🏆 Ranking
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="players">
+              <PlayerManager players={players} onAddPlayer={addPlayer} />
+            </TabsContent>
+
+            <TabsContent value="matches">
+              <MatchCreator players={players} onAddMatch={addMatch} />
+            </TabsContent>
+
+            <TabsContent value="ranking">
+              <RankingTable players={players} matches={matches} />
+            </TabsContent>
+          </Tabs>
         </div>
-
-        {/* Main Content */}
-        <Tabs defaultValue="players" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-800/95 border-gray-600/50 shadow-lg">
-            <TabsTrigger
-              value="players"
-              className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 text-gray-200 hover:text-white hover:bg-gray-700"
-            >
-              🎯 Jogadores
-            </TabsTrigger>
-            <TabsTrigger
-              value="matches"
-              className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 text-gray-200 hover:text-white hover:bg-gray-700"
-            >
-              🎱 Nova Partida
-            </TabsTrigger>
-            <TabsTrigger
-              value="ranking"
-              className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 text-gray-200 hover:text-white hover:bg-gray-700"
-            >
-              🏆 Ranking
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="players">
-            <PlayerManager players={players} onAddPlayer={addPlayer} />
-          </TabsContent>
-
-          <TabsContent value="matches">
-            <MatchCreator players={players} onAddMatch={addMatch} />
-          </TabsContent>
-
-          <TabsContent value="ranking">
-            <RankingTable players={players} matches={matches} />
-          </TabsContent>
-        </Tabs>
       </div>
 
       {/* Footer */}
