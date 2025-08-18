@@ -39,6 +39,9 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const { type, players, winner } = req.body
       
+      // Debug: log dos dados recebidos
+      console.log('Creating match with data:', { type, players, winner })
+      
       if (!type || !players || !winner) {
         return res.status(400).json({ error: 'Tipo, jogadores e vencedor são obrigatórios' })
       }
@@ -55,14 +58,51 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Vencedor deve ser um array não vazio' })
       }
       
+      // VALIDAÇÃO CRÍTICA: Verificar se não há IDs sendo enviados
+      const hasNumericPlayers = players.some(p => !isNaN(p) || /^\d+$/.test(p))
+      const hasNumericWinners = winner.some(w => !isNaN(w) || /^\d+$/.test(w))
+      
+      if (hasNumericPlayers) {
+        console.error('❌ ERRO CRÍTICO: IDs detectados em jogadores:', players)
+        return res.status(400).json({ 
+          error: 'Dados inválidos: IDs detectados em vez de nomes de jogadores. Por favor, use nomes válidos.' 
+        })
+      }
+      
+      if (hasNumericWinners) {
+        console.error('❌ ERRO CRÍTICO: IDs detectados em vencedores:', winner)
+        return res.status(400).json({ 
+          error: 'Dados inválidos: IDs detectados em vez de nomes de vencedores. Por favor, use nomes válidos.' 
+        })
+      }
+      
+      // Verificar se todos os jogadores e vencedores são strings válidas
+      const hasInvalidPlayers = players.some(p => typeof p !== 'string' || p.trim().length === 0)
+      const hasInvalidWinners = winner.some(w => typeof w !== 'string' || w.trim().length === 0)
+      
+      if (hasInvalidPlayers) {
+        return res.status(400).json({ 
+          error: 'Dados inválidos: Todos os jogadores devem ser nomes válidos (strings não vazias)' 
+        })
+      }
+      
+      if (hasInvalidWinners) {
+        return res.status(400).json({ 
+          error: 'Dados inválidos: Todos os vencedores devem ser nomes válidos (strings não vazias)' 
+        })
+      }
+      
       const sql = getDatabase()
       
       // Criar a partida com a nova estrutura
       const [newMatch] = await sql`
-        INSERT INTO matches (type, players, winner) 
-        VALUES (${type}, ${players}, ${winner}) 
+        INSERT INTO matches (type, players, winner, date) 
+        VALUES (${type}, ${players}, ${winner}, NOW()) 
         RETURNING id, type, players, winner, date
       `
+      
+      // Debug: log da partida criada
+      console.log('Match created:', newMatch)
       
       return res.status(200).json(newMatch)
     }

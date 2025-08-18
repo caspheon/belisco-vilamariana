@@ -164,6 +164,46 @@ export default function SinucaManager() {
     }
   }
 
+  const handleEditPlayer = async (playerId: number, newName: string) => {
+    if (!isLoggedIn) return
+    
+    try {
+      setError(null)
+      
+      // Atualizar nome do jogador via API
+      const response = await fetch(`/api/players/${playerId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: newName })
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao editar jogador')
+      }
+      
+      const result = await response.json()
+      
+      // Atualizar lista local de jogadores
+      setPlayers(prev => prev.map(p => 
+        p.id === playerId ? { ...p, name: newName } : p
+      ))
+      
+      // Recarregar dados completos para sincronizar estatísticas
+      await loadData()
+      
+      // Mostrar mensagem de sucesso com detalhes
+      setError(null)
+      alert(`✅ ${result.message}`)
+      
+    } catch (err: any) {
+      console.error('Erro ao editar jogador:', err)
+      setError(err.message || 'Erro ao editar jogador')
+    }
+  }
+
   // Carregar dados na inicialização
   useEffect(() => {
     loadData()
@@ -192,6 +232,7 @@ export default function SinucaManager() {
         onLogout={handleLogout}
         onDeletePlayer={handleDeletePlayer}
         onDeleteMatch={handleDeleteMatch}
+        onEditPlayer={handleEditPlayer}
         players={players}
         matches={matches}
       />
@@ -202,7 +243,7 @@ export default function SinucaManager() {
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-green-400 mb-2 flex items-center justify-center gap-3 drop-shadow-lg">
-              🎱 Sinuquinha do Belisco 🎱
+              Sinuquinha do Belisco
             </h1>
             <p className="text-green-300/90 text-base md:text-lg lg:text-xl">Organize partidas e acompanhe o ranking dos jogadores</p>
             
@@ -281,7 +322,7 @@ export default function SinucaManager() {
             </TabsList>
 
             <TabsContent value="players">
-              <PlayerManager players={players} onAddPlayer={addPlayer} />
+                              <PlayerManager players={players} matches={matches} onAddPlayer={addPlayer} />
             </TabsContent>
 
             <TabsContent value="matches">

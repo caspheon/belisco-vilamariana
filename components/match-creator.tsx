@@ -20,6 +20,9 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
   const [selectedWinners, setSelectedWinners] = useState<string[]>([])
 
+  // Organizar jogadores alfabeticamente
+  const sortedPlayers = [...players].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+
   const handlePlayerSelect = (playerName: string, position: number) => {
     if (!playerName) return // Proteção contra valores vazios
     
@@ -51,15 +54,41 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
     if (selectedPlayers.filter(Boolean).length === requiredPlayers && 
         selectedWinners.length === requiredWinners) {
       
-      // Converter nomes para IDs para enviar para a API
-      const playerIds = selectedPlayers.filter(Boolean).map(playerName => {
-        const player = players.find(p => p.name === playerName)
-        return player ? player.id.toString() : ""
-      }).filter(Boolean)
+      // Validação adicional: garantir que são nomes válidos, não IDs
+      const playerNames = selectedPlayers.filter(Boolean)
+      
+      // Verificar se todos os valores são strings válidas (nomes) e não números
+      const hasInvalidData = playerNames.some(name => {
+        // Verificar se é um número ou se contém apenas dígitos
+        if (typeof name === 'string' && (/^\d+$/.test(name) || !isNaN(Number(name)))) {
+          console.error('❌ ERRO: ID detectado em vez de nome:', name)
+          return true
+        }
+        return false
+      })
+      
+      if (hasInvalidData) {
+        alert('❌ Erro: Dados inválidos detectados. Por favor, selecione jogadores válidos.')
+        return
+      }
+      
+      // Verificar se os vencedores também são nomes válidos
+      const hasInvalidWinners = selectedWinners.some(winner => {
+        if (typeof winner === 'string' && (/^\d+$/.test(winner) || !isNaN(Number(winner)))) {
+          console.error('❌ ERRO: ID detectado em vencedores:', winner)
+          return true
+        }
+        return false
+      })
+      
+      if (hasInvalidWinners) {
+        alert('❌ Erro: Dados inválidos detectados nos vencedores. Por favor, selecione vencedores válidos.')
+        return
+      }
 
       onAddMatch({
         type: matchType,
-        players: playerIds,
+        players: playerNames, // Enviar nomes em vez de IDs
         winner: selectedWinners, // Sempre enviar como array
       })
 
@@ -90,7 +119,7 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
       <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-green-400 drop-shadow-sm">
-            <GamepadIcon className="h-5 w-5 text-green-400" />🎱 Nova Partida
+            <GamepadIcon className="h-5 w-5 text-green-400" />Nova Partida
           </CardTitle>
           <CardDescription className="text-gray-200">Configure uma nova partida de sinuca</CardDescription>
         </CardHeader>
@@ -142,28 +171,34 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
                      onValueChange={(value) => handlePlayerSelect(value, index)}
                      placeholder="Selecione um jogador"
                    >
-                                         {players
-                       .filter(
-                         (player) => !selectedPlayers.includes(player.name) || selectedPlayers[index] === player.name,
-                       )
-                       .map((player) => (
-                                                 <SelectItem
-                           key={player.id}
-                           value={player.name}
-                           className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
-                         >
-                          <div className="flex items-center justify-between w-full">
-                            <span>{player.name}</span>
-                            <Badge
-                              variant="outline"
-                              className="ml-2 border-green-400/70 text-green-400 bg-green-400/10"
-                            >
-                              {player.rating}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                  </Select>
+                     <SelectContent className="max-h-60 overflow-y-auto custom-scrollbar">
+                       {sortedPlayers
+                         .filter(
+                           (player) => {
+                             const isCurrentlySelected = selectedPlayers[index] === player.name
+                             const isSelectedElsewhere = selectedPlayers.includes(player.name) && !isCurrentlySelected
+                             return !isSelectedElsewhere
+                           }
+                         )
+                         .map((player) => (
+                           <SelectItem
+                             key={player.id}
+                             value={player.name}
+                             className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
+                           >
+                             <div className="flex items-center justify-between w-full">
+                               <span>{player.name}</span>
+                               <Badge
+                                 variant="outline"
+                                 className="ml-2 border-green-400/70 text-green-400 bg-green-400/10"
+                               >
+                                 {player.rating}
+                               </Badge>
+                             </div>
+                           </SelectItem>
+                         ))}
+                     </SelectContent>
+                   </Select>
                 </div>
               ))}
             </div>
@@ -183,17 +218,19 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
                   onValueChange={(value) => setSelectedWinners([value])}
                   placeholder="Selecione o vencedor"
                 >
-                                     {selectedPlayers.filter(Boolean).map((playerName) => {
-                     return (
-                       <SelectItem
-                         key={playerName}
-                         value={playerName}
-                         className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
-                       >
-                         {playerName}
-                       </SelectItem>
-                     )
-                   })}
+                  <SelectContent className="max-h-60 overflow-y-auto custom-scrollbar">
+                    {selectedPlayers.filter(Boolean).map((playerName) => {
+                      return (
+                        <SelectItem
+                          key={playerName}
+                          value={playerName}
+                          className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
+                        >
+                          {playerName}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
                 </Select>
               ) : (
                 // Seleção de dupla - múltiplos vencedores
@@ -240,7 +277,7 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
             className="w-full bg-green-600 hover:bg-green-500 shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg py-6"
             size="lg"
           >
-            <Trophy className="h-5 w-5 mr-2" />🎯 Registrar Partida
+            <Trophy className="h-5 w-5 mr-2" />Registrar Partida
           </Button>
         </CardContent>
       </Card>

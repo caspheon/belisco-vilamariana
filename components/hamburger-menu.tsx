@@ -14,6 +14,7 @@ interface HamburgerMenuProps {
   onLogout: () => void
   onDeletePlayer: (playerId: number) => void
   onDeleteMatch: (matchId: number) => void
+  onEditPlayer: (playerId: number, newName: string) => void
   players: Player[]
   matches: Match[]
 }
@@ -24,6 +25,7 @@ export function HamburgerMenu({
   onLogout, 
   onDeletePlayer,
   onDeleteMatch,
+  onEditPlayer,
   players,
   matches
 }: HamburgerMenuProps) {
@@ -36,6 +38,8 @@ export function HamburgerMenu({
   const [showMatchDelete, setShowMatchDelete] = useState(false)
   const [playerSearch, setPlayerSearch] = useState("")
   const [matchSearch, setMatchSearch] = useState("")
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
+  const [editPlayerName, setEditPlayerName] = useState("")
 
   const handleLogin = () => {
     if (username === "admin" && password === "admin") {
@@ -96,6 +100,26 @@ export function HamburgerMenu({
     }
   }
 
+  const startEditPlayer = (player: Player) => {
+    setEditingPlayer(player)
+    setEditPlayerName(player.name)
+  }
+
+  const cancelEditPlayer = () => {
+    setEditingPlayer(null)
+    setEditPlayerName("")
+  }
+
+  const saveEditPlayer = () => {
+    if (editPlayerName.trim() && editPlayerName !== editingPlayer?.name) {
+      if (editingPlayer) {
+        onEditPlayer(editingPlayer.id, editPlayerName.trim())
+        setEditingPlayer(null)
+        setEditPlayerName("")
+      }
+    }
+  }
+
   // Filtrar jogadores por busca
   const filteredPlayers = players.filter(player =>
     player.name.toLowerCase().includes(playerSearch.toLowerCase())
@@ -115,8 +139,8 @@ export function HamburgerMenu({
         <div className="flex items-center justify-between px-4 py-3">
           {/* Logo/Título do site */}
           <div className="flex items-center">
-            <h2 className="text-lg font-bold text-green-400 hidden sm:block">Sinuquinha do Belisco</h2>
-            <h2 className="text-base font-bold text-green-400 sm:hidden">🎱 Belisco</h2>
+            <h2 className="text-lg font-bold text-green-400 hidden sm:block"></h2>
+            <h2 className="text-base font-bold text-green-400 sm:hidden"></h2>
           </div>
 
           {/* Botão do menu hambúrguer */}
@@ -272,14 +296,24 @@ export function HamburgerMenu({
                                   Rating: {player.rating} | Partidas: {player.matches}
                                 </p>
                               </div>
-                              <Button
-                                onClick={() => handleDeletePlayer(player.id)}
-                                variant="outline"
-                                size="sm"
-                                className="ml-2 border-red-500/50 text-red-400 hover:bg-red-500/10 px-2 py-1"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  onClick={() => startEditPlayer(player)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 px-2 py-1"
+                                >
+                                  <User className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleDeletePlayer(player.id)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-red-500/50 text-red-400 hover:bg-red-500/10 px-2 py-1"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                           ))
                         )}
@@ -311,29 +345,82 @@ export function HamburgerMenu({
                             {matchSearch ? 'Nenhuma partida encontrada' : 'Nenhuma partida cadastrada'}
                           </p>
                         ) : (
-                          filteredMatches.map((match) => (
-                            <div key={match.id} className="flex items-center justify-between p-2 bg-gray-700/50 rounded border border-gray-600/30">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-white text-sm font-medium">
-                                  {match.type === 'individual' ? 'Individual' : 'Dupla'}
-                                </p>
-                                <p className="text-gray-400 text-xs truncate">
-                                  {match.players.join(' vs ')}
-                                </p>
-                                <p className="text-green-400 text-xs">
-                                  Vencedor: {Array.isArray(match.winner) ? match.winner.join(', ') : match.winner}
-                                </p>
+                          filteredMatches.map((match) => {
+                            // Organizar times para partidas em dupla
+                            let matchDisplay = ''
+                            let winnerDisplay = ''
+                            
+                            if (match.type === 'dupla') {
+                              // Para duplas: dividir em 2 times de 2 jogadores
+                              const team1 = match.players.slice(0, 2)
+                              const team2 = match.players.slice(2, 4)
+                              matchDisplay = `${team1.join(' e ')} vs ${team2.join(' e ')}`
+                            } else {
+                              // Para individuais: manter como está
+                              matchDisplay = match.players.join(' vs ')
+                            }
+                            
+                            // Formatar vencedores
+                            if (Array.isArray(match.winner)) {
+                              winnerDisplay = match.winner.join(', ')
+                            } else {
+                              winnerDisplay = match.winner
+                            }
+                            
+                            // Formatar data e hora se disponível
+                            const matchDate = match.date ? new Date(match.date) : null
+                            
+                            let formattedDate = 'N/A'
+                            let formattedTime = 'N/A'
+                            
+                            if (matchDate) {
+                              // Mesma lógica de Partidas Recentes: ajustar para UTC-3 subtraindo 3 horas
+                              const adjustedDate = new Date(matchDate.getTime() - (3 * 60 * 60 * 1000))
+                              
+                              formattedDate = adjustedDate.toLocaleDateString('pt-BR')
+                              formattedTime = adjustedDate.toLocaleTimeString('pt-BR', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            }
+                            
+                            return (
+                              <div key={match.id} className="flex items-center justify-between p-3 bg-gray-700/50 rounded border border-gray-600/30">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <p className="text-white text-sm font-medium">
+                                      {match.type === 'individual' ? 'Individual' : 'Dupla'}
+                                    </p>
+                                    <span className="text-gray-500 text-xs">
+                                      #{match.id}
+                                    </span>
+                                  </div>
+                                  
+                                  <p className="text-gray-300 text-sm mb-1">
+                                    {matchDisplay}
+                                  </p>
+                                  
+                                  <p className="text-green-400 text-xs mb-1">
+                                    Vencedor: {winnerDisplay}
+                                  </p>
+                                  
+                                  <div className="flex items-center gap-3 text-gray-400 text-xs">
+                                    <span>📅 {formattedDate}</span>
+                                    <span>🕐 {formattedTime}</span>
+                                  </div>
+                                </div>
+                                
+                                <Button
+                                  onClick={() => handleDeleteMatch(match.id)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="ml-2 border-red-500/50 text-red-400 hover:bg-red-500/10 px-2 py-1"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
                               </div>
-                              <Button
-                                onClick={() => handleDeleteMatch(match.id)}
-                                variant="outline"
-                                size="sm"
-                                className="ml-2 border-red-500/50 text-red-400 hover:bg-red-500/10 px-2 py-1"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))
+                            )
+                          })
                         )}
                       </div>
                     </CardContent>
@@ -402,6 +489,56 @@ export function HamburgerMenu({
                 </Button>
                 <Button 
                   onClick={() => setShowLogin(false)}
+                  variant="outline"
+                  className="flex-1 border-gray-600/50 text-gray-300 hover:bg-gray-700/50"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal de Edição de Nome do Jogador */}
+      {editingPlayer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <Card className="relative w-full max-w-sm bg-gray-800/95 border-blue-600/50 shadow-2xl">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-blue-400 text-xl text-center">Editar Nome do Jogador</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="editPlayerName" className="text-gray-200">Nome Atual</Label>
+                <p className="text-gray-300 text-sm bg-gray-700/50 p-2 rounded border border-gray-600/30">
+                  {editingPlayer.name}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="editPlayerName" className="text-gray-200">Novo Nome</Label>
+                <Input
+                  id="editPlayerName"
+                  type="text"
+                  value={editPlayerName}
+                  onChange={(e) => setEditPlayerName(e.target.value)}
+                  placeholder="Digite o novo nome"
+                  className="bg-gray-700/50 border-gray-600/50 text-white placeholder:text-gray-400"
+                  onKeyPress={(e) => e.key === 'Enter' && saveEditPlayer()}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  onClick={saveEditPlayer}
+                  disabled={!editPlayerName.trim() || editPlayerName.trim() === editingPlayer.name}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Salvar
+                </Button>
+                <Button 
+                  onClick={cancelEditPlayer}
                   variant="outline"
                   className="flex-1 border-gray-600/50 text-gray-300 hover:bg-gray-700/50"
                 >

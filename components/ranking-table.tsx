@@ -2,7 +2,9 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
-import { Trophy, Medal, Award, TrendingUp, Users, User } from "lucide-react"
+import { Trophy, Medal, Award, TrendingUp, Users, User, ChevronDown, ChevronUp } from "lucide-react"
+import { useState } from "react"
+import { Button } from "./ui/button"
 import type { Player, Match } from "../lib/types"
 
 interface RankingTableProps {
@@ -11,6 +13,8 @@ interface RankingTableProps {
 }
 
 export function RankingTable({ players, matches }: RankingTableProps) {
+  const [showAllPlayers, setShowAllPlayers] = useState(false)
+
   // Função para calcular vitórias por tipo de partida
   const calculateVictoriesByType = (playerName: string) => {
     let individualWins = 0
@@ -34,6 +38,41 @@ export function RankingTable({ players, matches }: RankingTableProps) {
     return { individualWins, duplaWins }
   }
 
+  // Função para calcular estatísticas detalhadas do jogador
+  const getPlayerDetailedStats = (playerName: string) => {
+    let individualWins = 0
+    let duplaWins = 0
+    let individualMatches = 0
+    let duplaMatches = 0
+
+    matches.forEach(match => {
+      if (!match.players || !match.winner) return
+
+      const isPlayerInMatch = match.players.includes(playerName)
+      if (!isPlayerInMatch) return
+
+      const winners = Array.isArray(match.winner) ? match.winner : [match.winner]
+      const isPlayerWinner = winners.includes(playerName)
+
+      if (match.type === 'individual') {
+        individualMatches++
+        if (isPlayerWinner) individualWins++
+      } else if (match.type === 'dupla') {
+        duplaMatches++
+        if (isPlayerWinner) duplaWins++
+      }
+    })
+
+    return { 
+      individualWins, 
+      duplaWins, 
+      individualMatches, 
+      duplaMatches,
+      totalWins: individualWins + duplaWins,
+      totalMatches: individualMatches + duplaMatches
+    }
+  }
+
   const sortedPlayers = [...players].sort((a, b) => {
     // Sort by rating first, then by win rate, then by total wins
     if (b.rating !== a.rating) return b.rating - a.rating
@@ -45,6 +84,9 @@ export function RankingTable({ players, matches }: RankingTableProps) {
 
     return b.wins - a.wins
   })
+
+  // Limitar para mostrar apenas os 10 primeiros ou todos se expandido
+  const displayedPlayers = showAllPlayers ? sortedPlayers : sortedPlayers.slice(0, 10)
 
   const getRankIcon = (position: number) => {
     switch (position) {
@@ -86,18 +128,23 @@ export function RankingTable({ players, matches }: RankingTableProps) {
       <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-green-400 drop-shadow-sm">
-            <Trophy className="h-5 w-5 text-green-400" />🏆 Ranking de Jogadores
+            <Trophy className="h-5 w-5 text-green-400" />Ranking de Jogadores
           </CardTitle>
           <CardDescription className="text-gray-200">
             Classificação baseada no rating e desempenho nas partidas
+            {!showAllPlayers && players.length > 10 && (
+              <span className="block mt-1 text-sm text-gray-400">
+                Mostrando os 10 primeiros de {players.length} jogadores
+              </span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {sortedPlayers.map((player, index) => {
+            {displayedPlayers.map((player, index) => {
               const position = index + 1
               const winRate = player.matches > 0 ? (player.wins / player.matches) * 100 : 0
-              const { individualWins, duplaWins } = calculateVictoriesByType(player.name)
+              const stats = getPlayerDetailedStats(player.name)
 
               return (
                 <div
@@ -123,17 +170,23 @@ export function RankingTable({ players, matches }: RankingTableProps) {
                           <span className="text-gray-400">•</span>
                           <span className="text-red-400 font-medium">{player.losses}D</span>
                         </div>
-                        {/* Nova linha com vitórias por tipo */}
+                        {/* Estatísticas detalhadas por tipo */}
                         <div className="flex items-center gap-3 mt-1 text-xs">
                           <div className="flex items-center gap-1 text-blue-400">
                             <User className="h-3 w-3" />
-                            <span>{individualWins} individual</span>
+                            <span>{stats.individualWins}V/{stats.individualMatches} individual</span>
                           </div>
                           <div className="flex items-center gap-1 text-purple-400">
                             <Users className="h-3 w-3" />
-                            <span>{duplaWins} dupla</span>
+                            <span>{stats.duplaWins}V/{stats.duplaMatches} dupla</span>
                           </div>
                         </div>
+                        {/* Verificação de consistência */}
+                        {stats.totalWins !== player.wins && (
+                          <div className="text-xs text-yellow-400 mt-1">
+                            ⚠️ Diferença: {player.wins} vs {stats.totalWins} vitórias calculadas
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -160,6 +213,29 @@ export function RankingTable({ players, matches }: RankingTableProps) {
               )
             })}
           </div>
+
+          {/* Botão Mostrar Mais/Menos */}
+          {players.length > 10 && (
+            <div className="flex justify-center mt-6">
+              <Button
+                onClick={() => setShowAllPlayers(!showAllPlayers)}
+                variant="outline"
+                className="border-green-400/50 text-green-400 hover:bg-green-400/10 hover:border-green-400 transition-all duration-200"
+              >
+                {showAllPlayers ? (
+                  <>
+                    <ChevronUp className="h-4 w-4 mr-2" />
+                    Mostrar Menos
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4 mr-2" />
+                    Mostrar Mais ({players.length - 10} jogadores restantes)
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -168,7 +244,7 @@ export function RankingTable({ players, matches }: RankingTableProps) {
         <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-green-400 drop-shadow-sm">
-              <TrendingUp className="h-5 w-5 text-green-400" />📊 Partidas Recentes
+              <TrendingUp className="h-5 w-5 text-green-400" />Partidas Recentes
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -269,3 +345,5 @@ export function RankingTable({ players, matches }: RankingTableProps) {
     </div>
   )
 }
+
+
