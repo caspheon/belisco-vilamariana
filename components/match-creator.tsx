@@ -8,14 +8,15 @@ import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
 import { Label } from "./ui/label"
 import { Badge } from "./ui/badge"
 import { GamepadIcon, Users, User, Trophy } from "lucide-react"
-import type { Player, CreateMatch } from "../lib/types"
+import type { Player, CreateMatch, Match } from "../lib/types"
 
 interface MatchCreatorProps {
   players: Player[]
+  matches: Match[]
   onAddMatch: (match: CreateMatch) => void
 }
 
-export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
+export function MatchCreator({ players, matches, onAddMatch }: MatchCreatorProps) {
   const [matchType, setMatchType] = useState<"individual" | "dupla">("individual")
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
   const [selectedWinners, setSelectedWinners] = useState<string[]>([])
@@ -45,6 +46,13 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
     } else {
       setSelectedWinners(prev => prev.filter(w => w !== winnerName))
     }
+  }
+
+  const handleMatchTypeChange = (newType: "individual" | "dupla") => {
+    setMatchType(newType)
+    // Limpar campos quando trocar o tipo de partida
+    setSelectedPlayers([])
+    setSelectedWinners([])
   }
 
   const handleCreateMatch = () => {
@@ -127,24 +135,24 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
           {/* Match Type Selection */}
           <div className="space-y-3">
             <Label className="text-base font-medium text-green-400 drop-shadow-sm">Tipo de Partida</Label>
-                                      <div className="grid grid-cols-2 gap-6 max-w-md mx-auto">
-               <div className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all duration-200 cursor-pointer h-24 text-center ${
-                 matchType === "individual" 
-                   ? "bg-green-600/20 border-green-400 text-green-400" 
-                   : "bg-gray-700/50 border-gray-600/50 text-gray-200 hover:bg-gray-600/50 hover:border-green-400/30"
-               }`} onClick={() => setMatchType("individual")}>
-                 <User className="h-6 w-6 mb-2" />
-                 <span className="font-medium text-sm">Individual (X1)</span>
-               </div>
-               <div className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all duration-200 cursor-pointer h-24 text-center ${
-                 matchType === "dupla" 
-                   ? "bg-green-600/20 border-green-400 text-green-400" 
-                   : "bg-gray-700/50 border-gray-600/50 text-gray-200 hover:bg-gray-600/50 hover:border-green-400/30"
-               }`} onClick={() => setMatchType("dupla")}>
-                 <Users className="h-6 w-6 mb-2" />
-                 <span className="font-medium text-sm">Dupla (2v2)</span>
-               </div>
-             </div>
+            <div className="grid grid-cols-2 gap-6 max-w-md">
+              <div className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all duration-200 cursor-pointer h-24 text-center ${
+                matchType === "individual" 
+                  ? "bg-green-600/20 border-green-400 text-green-400" 
+                  : "bg-gray-700/50 border-gray-600/50 text-gray-200 hover:bg-gray-600/50 hover:border-green-400/30"
+              }`} onClick={() => handleMatchTypeChange("individual")}>
+                <User className="h-6 w-6 mb-2" />
+                <span className="font-medium text-sm">Individual (X1)</span>
+              </div>
+              <div className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all duration-200 cursor-pointer h-24 text-center ${
+                matchType === "dupla" 
+                  ? "bg-green-600/20 border-green-400 text-green-400" 
+                  : "bg-gray-700/50 border-gray-600/50 text-gray-200 hover:bg-gray-600/50 hover:border-green-400/30"
+              }`} onClick={() => handleMatchTypeChange("dupla")}>
+                <Users className="h-6 w-6 mb-2" />
+                <span className="font-medium text-sm">Dupla (2v2)</span>
+              </div>
+            </div>
           </div>
 
           {/* Player Selection */}
@@ -162,42 +170,35 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
                       : `${index < 2 ? "Dupla A" : "Dupla B"} - Jogador ${(index % 2) + 1}`}
                   </Label>
                    <Select
-                     value={(() => {
-                       const playerId = selectedPlayers[index]
-                       if (!playerId) return ""
-                       const player = players.find(p => p.id.toString() === playerId)
-                       return player ? player.name : ""
-                     })()}
+                     value={selectedPlayers[index] || ""}
                      onValueChange={(value) => handlePlayerSelect(value, index)}
                      placeholder="Selecione um jogador"
+                     className="w-full"
                    >
-                     <SelectContent className="max-h-60 overflow-y-auto custom-scrollbar">
-                       {sortedPlayers
-                         .filter(
-                           (player) => {
-                             const isCurrentlySelected = selectedPlayers[index] === player.name
-                             const isSelectedElsewhere = selectedPlayers.includes(player.name) && !isCurrentlySelected
-                             return !isSelectedElsewhere
-                           }
-                         )
-                         .map((player) => (
-                           <SelectItem
-                             key={player.id}
-                             value={player.name}
-                             className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
-                           >
-                             <div className="flex items-center justify-between w-full">
-                               <span>{player.name}</span>
-                               <Badge
-                                 variant="outline"
-                                 className="ml-2 border-green-400/70 text-green-400 bg-green-400/10"
-                               >
-                                 {player.rating}
-                               </Badge>
-                             </div>
-                           </SelectItem>
-                         ))}
-                     </SelectContent>
+                     {sortedPlayers
+                       .filter(
+                         (player) => {
+                           const isCurrentlySelected = selectedPlayers[index] === player.name
+                           const isSelectedElsewhere = selectedPlayers.includes(player.name) && !isCurrentlySelected
+                           return !isSelectedElsewhere
+                         }
+                       )
+                       .map((player) => (
+                         <SelectItem
+                           key={player.id}
+                           value={player.name}
+                         >
+                           <div className="flex items-center justify-between w-full text-white">
+                             <span className="text-white">{player.name}</span>
+                             <Badge
+                               variant="outline"
+                               className="ml-2 border-green-400/70 text-green-400 bg-green-400/10"
+                             >
+                               {player.rating}
+                             </Badge>
+                           </div>
+                         </SelectItem>
+                       ))}
                    </Select>
                 </div>
               ))}
@@ -217,20 +218,18 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
                   value={selectedWinners[0] || ""} 
                   onValueChange={(value) => setSelectedWinners([value])}
                   placeholder="Selecione o vencedor"
+                  className="w-full"
                 >
-                  <SelectContent className="max-h-60 overflow-y-auto custom-scrollbar">
-                    {selectedPlayers.filter(Boolean).map((playerName) => {
-                      return (
-                        <SelectItem
-                          key={playerName}
-                          value={playerName}
-                          className="text-white hover:bg-gray-600/80 focus:bg-gray-600/80 transition-colors duration-150"
-                        >
-                          {playerName}
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
+                  {selectedPlayers.filter(Boolean).map((playerName) => {
+                    return (
+                      <SelectItem
+                        key={playerName}
+                        value={playerName}
+                      >
+                        {playerName}
+                      </SelectItem>
+                    )
+                  })}
                 </Select>
               ) : (
                 // Seleção de dupla - múltiplos vencedores
@@ -281,6 +280,65 @@ export function MatchCreator({ players, onAddMatch }: MatchCreatorProps) {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Partidas Recentes */}
+      {matches.length > 0 && (
+        <Card className="bg-gray-800/95 border-gray-600/50 shadow-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-400 drop-shadow-sm">
+              <GamepadIcon className="h-5 w-5 text-blue-400" />Partidas Recentes
+            </CardTitle>
+            <CardDescription className="text-gray-200">
+              Últimas 5 partidas registradas no sistema
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {matches.slice(0, 5).map((match, index) => {
+                const matchDate = new Date(match.date)
+                const adjustedDate = new Date(matchDate.getTime() - (3 * 60 * 60 * 1000)) // -3h UTC
+                
+                return (
+                  <div key={index} className="p-4 bg-gray-700/30 rounded-lg border border-gray-600/30 hover:bg-gray-700/50 transition-all duration-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={`${
+                          match.type === 'individual' 
+                            ? 'border-blue-400/50 text-blue-400 bg-blue-400/10' 
+                            : 'border-purple-400/50 text-purple-400 bg-purple-400/10'
+                        }`}>
+                          {match.type === 'individual' ? 'Individual' : 'Dupla'}
+                        </Badge>
+                        <span className="text-sm text-gray-400">
+                          📅 {adjustedDate.toLocaleDateString('pt-BR')} 🕐 {adjustedDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="text-sm text-gray-300">
+                        <span className="font-medium">Jogadores:</span> {(() => {
+                          if (match.type === 'individual') {
+                            return match.players.join(' vs ')
+                          } else {
+                            // Para duplas: "Jogador 1 e Jogador 2 vs Jogador 3 e Jogador 4"
+                            const duplaA = match.players.slice(0, 2).join(' e ')
+                            const duplaB = match.players.slice(2, 4).join(' e ')
+                            return `${duplaA} vs ${duplaB}`
+                          }
+                        })()}
+                      </div>
+                      <div className="text-sm text-green-400">
+                        <span className="font-medium">Vencedores:</span> {Array.isArray(match.winner) ? match.winner.join(' e ') : match.winner}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

@@ -311,7 +311,7 @@ export default function SinucaManager() {
                 value="matches"
                 className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 text-gray-200 hover:text-white hover:bg-gray-700 text-sm sm:text-base"
               >
-                🎱 Nova Partida
+                🎱 Partidas
               </TabsTrigger>
               <TabsTrigger
                 value="ranking"
@@ -322,11 +322,16 @@ export default function SinucaManager() {
             </TabsList>
 
             <TabsContent value="players">
-                              <PlayerManager players={players} matches={matches} onAddPlayer={addPlayer} />
+              <PlayerManager 
+                players={players} 
+                matches={matches} 
+                onAddPlayer={addPlayer}
+                isAdmin={isLoggedIn}
+              />
             </TabsContent>
 
             <TabsContent value="matches">
-              <MatchCreator players={players} onAddMatch={addMatch} />
+              <MatchCreator players={players} onAddMatch={addMatch} matches={matches} />
             </TabsContent>
 
             <TabsContent value="ranking">
